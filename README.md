@@ -20,8 +20,12 @@ python -m ui.cli input.mp4
 # 案件プロファイル適用（config/profiles/*.yaml）
 python -m ui.cli input.mp4 --profile youtube
 
-# EDL 出力 / ffmpeg で実際にカットした動画を書き出し
-python -m ui.cli input.mp4 --format edl
+# 書き出し形式: json / edl / html（編集確認プレビュー）/ fcpxml（NLE連携）
+python -m ui.cli input.mp4 --format html
+python -m ui.cli input.mp4 --format fcpxml
+
+# 品質レポート(json) / ffmpeg で実際にカットした動画を書き出し
+python -m ui.cli input.mp4 --report
 python -m ui.cli input.mp4 --render
 ```
 
@@ -38,5 +42,9 @@ python -m pytest
 プロファイル追加ができる。新しい解析やルールはレジストリに登録するだけで追加できる。
 
 ## 実装状況（MVP）
-- ✅ 無音検出 → 無音カット → タイムライン整形 → JSON/EDL/実カット出力、案件プロファイル
-- 🔲 filler / duplicate / restate ルール、speech 解析、AI 補助、GUI、NLE 連携（拡張点として枠のみ）
+- ✅ 無音検出 → 無音カット → タイムライン整形
+- ✅ 書き出し: JSON / EDL / HTML（編集確認プレビュー）/ FCPXML / 実カット動画
+- ✅ 発話区間解析（無音の補集合）、品質チェッカー（AIなし採点・レポート）
+- ✅ config スキーマ検証（設定ミスの早期検出）、案件プロファイル（youtube / interview）
+- 🌿 AI 補助の品質採点は `feature/ai-quality` ブランチで骨組み実装中（実プロバイダは選定待ち）
+- 🔲 filler / duplicate / restate ルール（ASR/発話内容解析が必要 → 案件確定後）、GUI 詳細

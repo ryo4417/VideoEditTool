@@ -79,10 +79,15 @@ python -m pytest
 - 方針: 監督者が管理できる範囲に数を抑える。不要になったものは畳み、必要な領域だけ増やす。
 
 ## 現状（MVP）
-- 実装済み:
-  - 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形 → json/edl/実カット出力
+- 実装済み（main）:
+  - 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形
+  - 書き出し: json / edl / html（編集確認プレビュー）/ fcpxml（NLE連携）/ 実カット動画
   - 発話区間解析（`audio/speech.py`, 無音の補集合。既定オフの拡張点）
   - 品質チェッカー（`quality/`, AIなしベースラインの編集レポート＋警告。`--report`）
-  - 案件プロファイル（youtube / interview）
-- 未実装（拡張点として枠のみ / 別ブランチ予定）: filler / duplicate / restate ルール、
-  AI補助（`ai.enabled`。品質採点・改善案は `feature/ai-quality` で開発予定）、UI詳細、NLE連携。
+  - config スキーマ検証（`core/config.py`, 未知キー/型/不正formatを早期検出）
+  - 案件プロファイル（youtube / interview）。テスト 38 passed。
+- 進行中（別ブランチ）:
+  - `feature/ai-quality`: AI補助の品質採点スキャフォールド（`quality/ai_assist.py`, NullAssessor）。
+    実プロバイダ(API/モデル)選定は仕様書 §11 により保留。
+- 未実装（拡張点として枠のみ / 案件確定後）: filler / duplicate / restate ルール
+  （ASR・発話内容解析が必要）、GUI詳細、NLE個別連携。
