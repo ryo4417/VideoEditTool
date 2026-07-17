@@ -35,10 +35,29 @@ class NullTranscriber(Transcriber):
         return []
 
 
+# モデルは重いので (name, device, compute_type) ごとに使い回す（連続解析の高速化）。
+_MODEL_CACHE: Dict[tuple, Any] = {}
+
+
+def _get_model(name: str, device: str, compute_type: str):
+    key = (name, device, compute_type)
+    if key not in _MODEL_CACHE:
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError as e:
+            raise RuntimeError(
+                "faster-whisper が未インストールです。"
+                "`pip install faster-whisper` を実行してください（ローカルWhisper用）。"
+            ) from e
+        _MODEL_CACHE[key] = WhisperModel(name, device=device, compute_type=compute_type)
+    return _MODEL_CACHE[key]
+
+
 class FasterWhisperTranscriber(Transcriber):
     """ローカル Whisper（faster-whisper）による文字起こし。
 
     依存は遅延 import。未インストールなら分かりやすく失敗させる。
+    モデルはプロセス内でキャッシュして使い回す。
     """
 
     def __init__(
@@ -54,15 +73,7 @@ class FasterWhisperTranscriber(Transcriber):
         self.compute_type = compute_type
 
     def transcribe(self, media_path: str) -> List[Word]:
-        try:
-            from faster_whisper import WhisperModel
-        except ImportError as e:
-            raise RuntimeError(
-                "faster-whisper が未インストールです。"
-                "`pip install faster-whisper` を実行してください（ローカルWhisper用）。"
-            ) from e
-
-        wm = WhisperModel(self.model, device=self.device, compute_type=self.compute_type)
+        wm = _get_model(self.model, self.device, self.compute_type)
         segments, _info = wm.transcribe(
             media_path, language=self.language, word_timestamps=True
         )

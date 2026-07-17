@@ -59,6 +59,12 @@ class Pipeline:
         # 4-4.5 タイムライン整形 + 品質チェック
         keep_segments, report = self._keep_and_report(media, candidates)
 
+        # 設定の矛盾に気づけるよう警告（silence と tempo は同じ無音を別方針で扱う）。
+        if self.config.get("rules.silence.enabled") and self.config.get("rules.tempo.enabled"):
+            report.warnings.append(
+                "silence と tempo を同時に有効化しています（無音の扱いが競合する可能性）。"
+            )
+
         # 4.6 AI補助（任意・ローカルLLM）。無効時は何もしない＝ベースラインのまま。
         #     AIは補助のため、失敗しても編集は成立させる（警告に載せるだけ）。
         assessor = get_assessor(self.config.section("ai"))

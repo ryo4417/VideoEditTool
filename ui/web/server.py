@@ -191,9 +191,16 @@ class Handler(BaseHTTPRequestHandler):
         if status == HTTPStatus.PARTIAL_CONTENT:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
         self.end_headers()
+        # 大きな動画でも一気に読み込まず、チャンクで送る（メモリ節約）。
+        remaining = length
         with open(path, "rb") as f:
             f.seek(start)
-            self.wfile.write(f.read(length))
+            while remaining > 0:
+                chunk = f.read(min(65536, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
 
     # --- 低レベルヘルパ ---
     def _read_json(self) -> dict:
