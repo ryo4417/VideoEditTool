@@ -24,7 +24,8 @@ _FIXED_SCHEMA: Dict[str, Dict[str, Union[Type, Tuple[Type, ...]]]] = {
     "project": {"name": str, "version": str},
     "timeline": {"merge_gap_sec": _NUM, "min_segment_sec": _NUM},
     "quality": {"report": bool, "max_removed_ratio": _NUM, "warn_min_segment_sec": _NUM},
-    "export": {"format": str, "output_dir": str, "render": bool, "render_ext": str},
+    "export": {"format": str, "output_dir": str, "render": bool, "render_ext": str,
+               "stem_suffix": str},
     "ai": {"enabled": bool, "provider": str, "model": str, "host": str},
 }
 # 開放セクション: 子キーはプラグイン名（任意）。子は dict で、enabled があれば bool。

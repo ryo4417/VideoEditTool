@@ -139,7 +139,8 @@ class Pipeline:
         export_cfg = self.config.section("export")
         out_dir = Path(output_dir or export_cfg.get("output_dir", "output"))
         out_dir.mkdir(parents=True, exist_ok=True)
-        stem = Path(media.path).stem
+        # stem_suffix でプロファイル別などに出力名を分けられる（上書き衝突回避）。
+        stem = Path(media.path).stem + str(export_cfg.get("stem_suffix", ""))
 
         outputs: List[str] = []
         if self.config.get("quality.report", False):
