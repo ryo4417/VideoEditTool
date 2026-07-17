@@ -88,9 +88,10 @@ python -m pytest
   - 書き出し: json / edl / html / fcpxml / 実カット動画
   - 発話区間解析、品質チェッカー（`quality/`, `--report`）、config スキーマ検証
   - 案件プロファイル（youtube / interview）。テスト 51 passed。
-- 進行中（別ブランチ）:
-  - `feature/ai-quality`: AI補助の品質採点スキャフォールド（LLMプロバイダ選定待ち）。
-- 未実装/開発中: duplicate / restate ルール、テンポ調整、GUIのUX強化（波形等）。
+  - 重複除去 / 言い直し(方式B) ルール（内容ベース）
+  - **AI品質採点（ローカルLLM / Ollama）**（`quality/ai_assist.py`, 既定オフ・オフライン・補助）
+  - GUI: 波形表示・解析オプション選択。テスト 72 passed。
+- 保留: テンポ調整（仕様が割れるため要判断）、案件マニュアル学習（マニュアル未提供）。
 
 ## パイプラインAPI（`pipeline.Pipeline`）
 - `analyze(path)` → 書き出さず解析結果を返す（GUI用）
