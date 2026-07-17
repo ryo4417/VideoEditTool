@@ -16,7 +16,14 @@ from core.rule import BaseRule
 
 DEFAULT_MIN_WORDS = 2
 DEFAULT_MAX_WORDS = 6
-DEFAULT_SIM_THRESHOLD = 0.5
+DEFAULT_SIM_THRESHOLD = 0.6
+
+# 助詞・語尾など機能語。これらの共有だけでは「言い直し」と判定しない
+# （例:「今日は」「明日は」は は の共有のみ→言い直しではない）。
+FUNCTION_WORDS = {
+    "は", "が", "を", "に", "へ", "と", "で", "も", "の", "や", "から", "まで",
+    "です", "ます", "だ", "た", "て", "し", "か", "ね", "よ", "な", "ん",
+}
 
 
 def _normalize(text: str) -> str:
@@ -48,7 +55,11 @@ class RestateRule(BaseRule):
                 a, b = norm[i:i + w], norm[i + w:i + 2 * w]
                 if not all(a) or not all(b) or a == b:
                     continue  # 空・完全一致(=duplicate)は対象外
-                overlap = len(set(a) & set(b)) / w
+                shared = set(a) & set(b)
+                # 機能語（助詞・語尾）だけの共有は言い直しではない。
+                if not (shared - FUNCTION_WORDS):
+                    continue
+                overlap = len(shared) / w
                 if overlap >= sim:
                     phrase = "".join(words[j].text for j in range(i, i + w))
                     candidates.append(

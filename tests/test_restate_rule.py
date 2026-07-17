@@ -37,3 +37,21 @@ def test_dissimilar_phrases_not_cut():
         Word(0.8, 1.2, "空"), Word(1.2, 1.6, "青"),
     ]
     assert RestateRule({"sim_threshold": 0.5}).apply(_analysis(words)) == []
+
+
+def test_shared_particle_only_is_not_restate():
+    # 「今日は」「明日は」: 共有は は(機能語)のみ → 言い直しではない（誤カット防止）
+    words = [
+        Word(0, 0.4, "今日"), Word(0.4, 0.8, "は"),
+        Word(0.8, 1.2, "明日"), Word(1.2, 1.6, "は"),
+    ]
+    assert RestateRule().apply(_analysis(words)) == []
+
+
+def test_shared_copula_only_is_not_restate():
+    # 「これです」「それです」: 共有は です(機能語)のみ → 対象外
+    words = [
+        Word(0, 0.4, "これ"), Word(0.4, 0.8, "です"),
+        Word(0.8, 1.2, "それ"), Word(1.2, 1.6, "です"),
+    ]
+    assert RestateRule().apply(_analysis(words)) == []

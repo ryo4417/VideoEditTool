@@ -26,6 +26,8 @@ class SilenceRule(BaseRule):
             # 前後に padding を残して内側だけカットする。
             cut_start = silence.start + padding
             cut_end = silence.end - padding
+            if cut_end <= cut_start:
+                continue  # padding や負のconfigで逆転/ゼロになる区間は無条件スキップ
             if cut_end - cut_start < min_cut:
                 continue
             candidates.append(

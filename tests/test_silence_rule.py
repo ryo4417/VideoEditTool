@@ -27,6 +27,12 @@ def test_short_silence_ignored():
     assert candidates == []
 
 
+def test_negative_min_cut_does_not_crash():
+    # 負のconfigでも TimeRange逆転→ValueError で落ちない（GPT/エージェント指摘）
+    rule = SilenceRule({"min_cut_sec": -1.0, "keep_padding_sec": 0.1})
+    assert rule.apply(_analysis_with_silences((10.0, 10.15))) == []
+
+
 def test_padding_respects_config():
     rule = SilenceRule({"min_cut_sec": 0.1, "keep_padding_sec": 0.0})
     candidates = rule.apply(_analysis_with_silences((5.0, 6.0)))
