@@ -11,6 +11,7 @@ from rules import duplicate_rule as _duplicate_rule  # noqa: F401
 from rules import filler_rule as _filler_rule  # noqa: F401
 from rules import restate_rule as _restate_rule  # noqa: F401
 from rules import silence_rule as _silence_rule  # noqa: F401
+from rules import tempo_rule as _tempo_rule  # noqa: F401
 
 
 def load_builtins() -> None:

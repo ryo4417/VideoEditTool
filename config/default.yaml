@@ -44,6 +44,10 @@ rules:
     min_words: 2
     max_words: 6
     sim_threshold: 0.5        # 隣接句の語の共有率がこれ以上なら言い直しとみなす
+  tempo:                      # テンポ調整（長い間の超過分だけカット。要 analysis.silence）
+    enabled: false            # silence を全消しせず自然な間を残したい場合に使う
+    target_pause_sec: 0.4     # 残す間の長さ
+    min_gap_sec: 0.6          # これ以上の間だけ短縮対象
 
 # --- タイムライン整形 ---
 timeline:
