@@ -103,10 +103,24 @@ class Handler(BaseHTTPRequestHandler):
         if not path or not os.path.isfile(path):
             raise FileNotFoundError(f"ファイルが見つかりません: {path}")
         config = load_config(profile)
+        self._apply_toggles(config, params)
         result = Pipeline(config).analyze(path)
         with _CACHE_LOCK:
             _CACHE[path] = result
         self._json(_result_json(result))
+
+    @staticmethod
+    def _apply_toggles(config, params: dict) -> None:
+        """GUIの解析オプション（rules / transcript）を config に反映する。"""
+        transcript = _one(params, "transcript") == "1"
+        rules_param = _one(params, "rules")
+        if transcript:
+            config.data.setdefault("analysis", {}).setdefault("transcript", {})["enabled"] = True
+        if rules_param:
+            requested = {r for r in rules_param.split(",") if r}
+            for name, opts in config.section("rules").items():
+                if isinstance(opts, dict):
+                    opts["enabled"] = name in requested
 
     def _api_waveform(self, params: dict) -> None:
         path = _one(params, "path")

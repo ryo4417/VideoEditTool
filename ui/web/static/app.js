@@ -149,10 +149,21 @@ async function analyze() {
   const path = $("path").value.trim();
   const profile = $("profile").value;
   if (!path) { $("status").textContent = "パスを入力してください。"; return; }
+  // 検出オプション。フィラー/重複は文字起こしが前提なので自動で有効化。
+  const rules = [];
+  if ($("r_silence").checked) rules.push("silence");
+  if ($("r_filler").checked) rules.push("filler");
+  if ($("r_duplicate").checked) rules.push("duplicate");
+  const needTranscript = $("r_transcript").checked || $("r_filler").checked || $("r_duplicate").checked;
+  if (needTranscript) $("r_transcript").checked = true;
+
   $("analyze").disabled = true;
-  $("status").textContent = "解析中…（文字起こし有効時は時間がかかります）";
+  $("status").textContent = needTranscript
+    ? "解析中…（文字起こしはモデルDL/推論で時間がかかります）"
+    : "解析中…";
   try {
-    const url = `/api/analyze?path=${encodeURIComponent(path)}&profile=${encodeURIComponent(profile)}`;
+    const url = `/api/analyze?path=${encodeURIComponent(path)}&profile=${encodeURIComponent(profile)}`
+      + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}`;
     const res = await fetch(url);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "解析に失敗しました");

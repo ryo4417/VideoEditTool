@@ -88,6 +88,13 @@
         <button id="analyze">解析</button>
       </div>
     </div>
+    <div class="row" style="margin-top:.7rem; gap:1rem;">
+      <span style="font-size:.8rem; color:var(--muted);">検出:</span>
+      <label><input type="checkbox" id="r_silence" checked> 無音</label>
+      <label><input type="checkbox" id="r_filler"> フィラー</label>
+      <label><input type="checkbox" id="r_duplicate"> 重複</label>
+      <label title="フィラー/重複にはローカルWhisperが必要"><input type="checkbox" id="r_transcript"> 文字起こし(Whisper)</label>
+    </div>
     <div id="status" style="margin-top:.6rem;">動画パスを入力して「解析」を押してください。</div>
   </div>
 
