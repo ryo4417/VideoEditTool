@@ -65,6 +65,11 @@ python -m pytest
 4. `tests/` にテストを追加
 → エンジンや他モジュールの変更は不要。
 
+## サブエージェント（`.claude/agents/`）
+- **役割別（実装/管理）**: `project-manager` / `core-architect` / `audio-analyzer` / `rule-engine` / `timeline-engine` / `export-engine` / `ui-engineer` / `qa-agent`（バグ探し） / `doc-agent` / `design-reviewer`（設計全体）
+- **各機能の改善提案係（提案のみ・コードは書かない）**: `improve-core` / `improve-audio` / `improve-rules` / `improve-timeline` / `improve-export` / `improve-ui`
+  - 各機能ドメインに特化し「課題→改善案→期待効果→影響範囲→優先度」で提案する。
+
 ## 現状（MVP）
 - 実装済み: 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形 → json/edl/実カット出力。案件プロファイル（youtube / interview）。
 - 未実装（拡張点として枠のみ）: filler / duplicate / restate ルール、speech解析、AI補助、UI詳細、NLE連携。案件内容確定後に実装する。
