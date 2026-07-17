@@ -1,0 +1,13 @@
+# --- 実行時（必須） ---
+PyYAML>=6.0        # 設定ファイル（config駆動）
+# ffmpeg / ffprobe は外部バイナリ。PATH に通しておくこと。
+
+# --- 将来利用（仕様書のプラグイン候補。現時点では未使用） ---
+# numpy>=1.26       # 波形解析
+# opencv-python     # 画像解析
+# scenedetect       # シーン検出（PySceneDetect）
+# librosa           # 音響解析
+# onnxruntime       # AI推論（品質確認用・将来）
+
+# --- 開発（テスト） ---
+pytest>=8.0

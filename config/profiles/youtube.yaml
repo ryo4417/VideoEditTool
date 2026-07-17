@@ -1,0 +1,14 @@
+# YouTube 向けプロファイル（テンポ重視・無音を強めにカット）
+# default.yaml を深いマージで上書きする。
+
+analysis:
+  silence:
+    min_silence_sec: 0.3
+
+rules:
+  silence:
+    min_cut_sec: 0.3
+    keep_padding_sec: 0.05
+
+timeline:
+  merge_gap_sec: 0.15

@@ -1,0 +1,14 @@
+# インタビュー向けプロファイル（間を残す・保守的にカット）
+
+analysis:
+  silence:
+    min_silence_sec: 0.8
+
+rules:
+  silence:
+    min_cut_sec: 1.0
+    keep_padding_sec: 0.2
+
+timeline:
+  merge_gap_sec: 0.3
+  min_segment_sec: 0.5

@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+# リポジトリ直下を import 起点にする（core, audio, rules ... を解決）。
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100

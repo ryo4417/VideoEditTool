@@ -1,0 +1,46 @@
+# =====================================================================
+# VideoEditTool 既定設定
+#   編集条件は全てここで管理する（コード変更不要）。
+#   案件プロファイル（config/profiles/*.yaml）でこの値を上書きできる。
+# =====================================================================
+
+project:
+  name: VideoEditTool
+  version: "0.1.0"
+
+# --- 解析（アナライザ）: name ごとに enabled で ON/OFF ---
+analysis:
+  silence:
+    enabled: true
+    noise_threshold_db: -30   # これ以下(dB)を無音とみなす
+    min_silence_sec: 0.5      # これ以上続く無音のみ検出
+
+# --- 編集ルール: name ごとに enabled で ON/OFF ---
+rules:
+  silence:
+    enabled: true
+    min_cut_sec: 0.5          # この長さを超える無音のみカット
+    keep_padding_sec: 0.1     # 発話前後に残す余白
+  # 以下は未実装ルールの拡張点（仕様確定後に実装）。
+  filler:
+    enabled: false
+  duplicate:
+    enabled: false
+  restate:                    # 言い直し
+    enabled: false
+
+# --- タイムライン整形 ---
+timeline:
+  merge_gap_sec: 0.2          # この間隔以下の残す区間は結合
+  min_segment_sec: 0.3        # これ未満の残す区間は除去
+
+# --- 書き出し ---
+export:
+  format: json                # json | edl
+  output_dir: output
+  render: false               # true で ffmpeg による実カット動画を出力
+  render_ext: mp4
+
+# --- AI（補助のみ・既定オフ。仕様書 §9）---
+ai:
+  enabled: false              # 品質採点・編集漏れ確認・改善案などに限定
