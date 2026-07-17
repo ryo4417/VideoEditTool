@@ -106,6 +106,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/export":
                 self._api_export()
+            elif parsed.path == "/api/upload":
+                self._api_upload(parse_qs(parsed.query, keep_blank_values=True))
+            elif parsed.path == "/api/make_sample":
+                self._api_make_sample()
             else:
                 self._error(HTTPStatus.NOT_FOUND, f"not found: {parsed.path}")
         except (ConfigError, FileNotFoundError, FFmpegNotFound, MediaProbeError, ValueError) as e:
@@ -115,10 +119,12 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- API ---
     def _api_analyze(self, params: dict) -> None:
-        path = _one(params, "path")
+        path = _clean_path(_one(params, "path"))
         profile = _one(params, "profile") or None
         if not path or not os.path.isfile(path):
-            raise FileNotFoundError(f"ファイルが見つかりません: {path}")
+            raise FileNotFoundError(
+                f"ファイルが見つかりません: {path}（パスの前後の引用符や空白にご注意ください）"
+            )
         config = load_config(profile)
         self._apply_toggles(config, params)
         result = Pipeline(config).analyze(path)
@@ -144,8 +150,46 @@ class Handler(BaseHTTPRequestHandler):
                 if isinstance(opts, dict):
                     opts["enabled"] = name in requested
 
+    def _api_upload(self, params: dict) -> None:
+        """ドラッグ&ドロップ/ファイル選択で送られた動画を uploads/ に保存しパスを返す。"""
+        name = os.path.basename(_one(params, "name") or "upload.mp4").strip() or "upload.mp4"
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0:
+            raise ValueError("アップロードデータがありません")
+        up_dir = _BASE_DIR / "uploads"
+        up_dir.mkdir(parents=True, exist_ok=True)
+        dest = up_dir / name
+        remaining = length
+        with open(dest, "wb") as f:
+            while remaining > 0:
+                chunk = self.rfile.read(min(1 << 20, remaining))
+                if not chunk:
+                    break
+                f.write(chunk)
+                remaining -= len(chunk)
+        self._json({"path": str(dest)})
+
+    def _api_make_sample(self) -> None:
+        """お試し用のサンプル動画（無音ギャップ入り）を生成してパスを返す。"""
+        import subprocess
+
+        from core.ffmpeg import FFMPEG, ensure_available
+        ensure_available()
+        up_dir = _BASE_DIR / "uploads"
+        up_dir.mkdir(parents=True, exist_ok=True)
+        dest = up_dir / "sample.mp4"
+        cmd = [
+            FFMPEG, "-y", "-v", "error",
+            "-f", "lavfi", "-i", "testsrc=duration=12:size=640x360:rate=25",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=12",
+            "-af", "volume='if(between(t,3,5)+between(t,8,9),0,1)':eval=frame",
+            "-shortest", "-c:v", "libx264", "-c:a", "aac", str(dest),
+        ]
+        subprocess.run(cmd, capture_output=True, timeout=120, check=True)
+        self._json({"path": str(dest)})
+
     def _api_waveform(self, params: dict) -> None:
-        path = _one(params, "path")
+        path = _clean_path(_one(params, "path"))
         if not path or not os.path.isfile(path):
             raise FileNotFoundError(f"ファイルが見つかりません: {path}")
         buckets = int(_one(params, "buckets") or 400)
@@ -192,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _serve_media(self, params: dict) -> None:
         """<video> 用にローカル動画を Range 対応で配信する。"""
-        path = _one(params, "path")
+        path = _clean_path(_one(params, "path"))
         if not path or not os.path.isfile(path):
             self._error(HTTPStatus.NOT_FOUND, "media not found")
             return
@@ -252,6 +296,11 @@ class Handler(BaseHTTPRequestHandler):
 def _one(params: dict, key: str) -> str:
     values = params.get(key)
     return values[0] if values else ""
+
+
+def _clean_path(p: str) -> str:
+    """貼り付けパスの前後の引用符・空白を除去（Windowsの「パスのコピー」対策）。"""
+    return (p or "").strip().strip('"').strip("'").strip()
 
 
 # GUIからの出力先は作業ディレクトリ配下に限定（任意パスへの書き込みを防ぐ）。

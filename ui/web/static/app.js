@@ -167,9 +167,11 @@ function drawWaveform(peaks) {
 }
 
 async function analyze() {
-  const path = $("path").value.trim();
+  // 前後の引用符・空白を除去（Windowsの「パスのコピー」で付く "…" 対策）。
+  const path = $("path").value.trim().replace(/^["']|["']$/g, "").trim();
+  $("path").value = path;
   const profile = $("profile").value;
-  if (!path) { $("status").textContent = "パスを入力してください。"; return; }
+  if (!path) { $("status").textContent = "動画をドロップ／選択するか、パスを入力してください。"; return; }
   // 検出オプション。内容ベース(フィラー/重複/言い直し)は文字起こしが前提。
   const rules = [];
   if ($("r_silence").checked) rules.push("silence");
@@ -203,7 +205,14 @@ async function analyze() {
     };
     $("video").src = `/media?path=${encodeURIComponent(path)}`;
     $("result").classList.remove("hidden");
-    $("status").textContent = `解析完了: ${data.media.name}`;
+    // 空状態のガイド（無言の空振り防止）。
+    if (STATE.candidates.length === 0) {
+      $("status").textContent = rules.length === 0
+        ? "検出項目が選ばれていません。まず「無音」にチェックを入れて解析してください。"
+        : `解析完了: ${data.media.name} — 該当するカット箇所は見つかりませんでした。`;
+    } else {
+      $("status").textContent = `解析完了: ${data.media.name}`;
+    }
     renderCandidates(); renderMetrics(); renderWarnings(); renderTranscript();
     loadWaveform(path); // タイムライン背景に波形（装飾・非同期）
   } catch (e) {
@@ -252,3 +261,43 @@ $("timeline").addEventListener("click", (ev) => {
 $("analyze").onclick = analyze;
 $("export").onclick = doExport;
 $("path").addEventListener("keydown", (e) => { if (e.key === "Enter") analyze(); });
+
+// --- ファイル投入（アップロード）・ドラッグ&ドロップ・お試し動画 ---
+async function uploadFile(file) {
+  $("status").textContent = `読み込み中… ${file.name}`;
+  try {
+    const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`,
+      { method: "POST", body: file });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "読み込みに失敗しました");
+    $("path").value = data.path;
+    $("status").textContent = `読み込み完了: ${file.name} → 「解析」を押してください`;
+  } catch (e) {
+    $("status").textContent = "エラー: " + e.message;
+  }
+}
+
+$("pick").onclick = () => $("file").click();
+$("file").addEventListener("change", (e) => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+
+const drop = $("drop");
+["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.style.borderColor = "var(--accent)";
+}));
+["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => {
+  e.preventDefault(); drop.style.borderColor = "var(--border)";
+}));
+drop.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+
+$("sample").onclick = async () => {
+  $("status").textContent = "お試し動画を作成中…";
+  try {
+    const res = await fetch("/api/make_sample", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "作成に失敗しました");
+    $("path").value = data.path;
+    $("status").textContent = "お試し動画を作成しました → 「解析」を押してください";
+  } catch (e) {
+    $("status").textContent = "エラー: " + e.message;
+  }
+};

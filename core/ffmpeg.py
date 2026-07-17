@@ -54,8 +54,13 @@ def probe(path: str) -> MediaInfo:
     # 日本語を含むパスで JSON が壊れるため、UTF-8 を明示する。
     proc = _run(cmd, 120, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
-        detail = (proc.stderr or "").strip() or "ffprobe が失敗しました"
-        raise MediaProbeError(f"メディアを読めません: {path}\n  {detail}")
+        # 生のffmpeg英語エラーは補足に留め、分かりやすい日本語を主メッセージにする。
+        detail = (proc.stderr or "").strip().splitlines()[-1:] or ["ffprobe が失敗しました"]
+        raise MediaProbeError(
+            f"このファイルは動画として読めませんでした: {path}\n"
+            f"  対応形式の動画（mp4 / mov / mkv など）を指定してください。\n"
+            f"  詳細: {detail[0]}"
+        )
     try:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError as e:

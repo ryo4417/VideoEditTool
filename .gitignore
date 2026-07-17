@@ -42,6 +42,7 @@ temp/
 # 出力ディレクトリ
 output/
 out/
+uploads/
 dist/
 build/
 renders/
