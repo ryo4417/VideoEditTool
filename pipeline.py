@@ -37,7 +37,11 @@ class Pipeline:
         load_builtins()
         self.config = config
 
-    def run(self, input_path: str, output_dir: str | None = None) -> PipelineResult:
+    def analyze(self, input_path: str) -> PipelineResult:
+        """読み込み→解析→候補→整形→品質チェックまで（書き出しはしない）。
+
+        GUI など「確認してから書き出す」用途はこれを使う。
+        """
         # 1. 読み込み
         media = ffmpeg.probe(input_path)
 
@@ -51,17 +55,8 @@ class Pipeline:
         engine = RuleEngine(self.config.section("rules"))
         candidates = engine.run(analysis)
 
-        # 4. タイムライン構築・整形（確認用の keep 区間）
-        tl_manager = TimelineManager(self.config.section("timeline"))
-        timeline = tl_manager.build(media, candidates)
-        keep_segments = tl_manager.refine_keep_segments(timeline)
-
-        # 4.5 品質チェック（AIなしベースライン。確認・レポート用）
-        checker = QualityChecker(self.config.section("quality"))
-        report = checker.check(media, candidates, keep_segments)
-
-        # 5. 書き出し
-        outputs = self._export(media, candidates, keep_segments, report, output_dir)
+        # 4-4.5 タイムライン整形 + 品質チェック
+        keep_segments, report = self._keep_and_report(media, candidates)
 
         return PipelineResult(
             media=media,
@@ -69,7 +64,43 @@ class Pipeline:
             candidates=candidates,
             keep_segments=keep_segments,
             report=report,
-            outputs=outputs,
+        )
+
+    def run(self, input_path: str, output_dir: str | None = None) -> PipelineResult:
+        result = self.analyze(input_path)
+        result.outputs = self._export(
+            result.media, result.candidates, result.keep_segments, result.report, output_dir
+        )
+        return result
+
+    def export_result(self, result: PipelineResult, output_dir: str | None = None) -> List[str]:
+        """既に解析済みの result を（現在の config の形式で）書き出す。"""
+        return self._export(
+            result.media, result.candidates, result.keep_segments, result.report, output_dir
+        )
+
+    def _keep_and_report(self, media: MediaInfo, candidates: List[EditCandidate]):
+        """候補（CUT）から keep 区間と品質レポートを算出する。"""
+        tl_manager = TimelineManager(self.config.section("timeline"))
+        timeline = tl_manager.build(media, candidates)
+        keep_segments = tl_manager.refine_keep_segments(timeline)
+        checker = QualityChecker(self.config.section("quality"))
+        report = checker.check(media, candidates, keep_segments)
+        return keep_segments, report
+
+    def recompute(self, result: PipelineResult, enabled_indices: List[int]) -> PipelineResult:
+        """候補の採否（index の集合）に基づいて keep/report を再計算した結果を返す。
+
+        GUI で候補をトグルしたときに使う。元の result は変更しない。
+        """
+        chosen = [result.candidates[i] for i in enabled_indices if 0 <= i < len(result.candidates)]
+        keep_segments, report = self._keep_and_report(result.media, chosen)
+        return PipelineResult(
+            media=result.media,
+            analysis=result.analysis,
+            candidates=chosen,
+            keep_segments=keep_segments,
+            report=report,
         )
 
     @staticmethod
