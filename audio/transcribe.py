@@ -69,6 +69,8 @@ class FasterWhisperTranscriber(Transcriber):
         words: List[Word] = []
         for seg in segments:
             for w in (getattr(seg, "words", None) or []):
+                if w.start is None or w.end is None:
+                    continue  # まれにタイムスタンプ欠落があるため防御
                 words.append(Word(start=float(w.start), end=float(w.end), text=w.word.strip()))
         return words
 

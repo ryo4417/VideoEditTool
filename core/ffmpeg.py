@@ -22,6 +22,10 @@ class FFmpegNotFound(RuntimeError):
     pass
 
 
+class MediaProbeError(RuntimeError):
+    """メディアを読めない（破損・非対応・動画でない等）。"""
+
+
 def ensure_available() -> None:
     """ffmpeg / ffprobe が PATH 上にあることを確認する。"""
     for exe in (FFMPEG, FFPROBE):
@@ -38,8 +42,14 @@ def probe(path: str) -> MediaInfo:
         FFPROBE, "-v", "error", "-print_format", "json",
         "-show_format", "-show_streams", path,
     ]
-    out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
-    data = json.loads(out)
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        detail = (proc.stderr or "").strip() or "ffprobe が失敗しました"
+        raise MediaProbeError(f"メディアを読めません: {path}\n  {detail}")
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError as e:
+        raise MediaProbeError(f"メディア情報の解析に失敗: {path} ({e})") from e
 
     duration = float(data.get("format", {}).get("duration", 0.0) or 0.0)
     info = MediaInfo(path=path, duration=duration)

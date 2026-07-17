@@ -21,7 +21,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from core.config import ConfigError, load_config
-from core.ffmpeg import FFmpegNotFound
+from core.ffmpeg import FFmpegNotFound, MediaProbeError
 from core.models import EditCandidate
 from pipeline import Pipeline, PipelineResult
 
@@ -79,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._serve_static(Path(route).name)
             else:
                 self._error(HTTPStatus.NOT_FOUND, f"not found: {route}")
-        except (ConfigError, FileNotFoundError, FFmpegNotFound) as e:
+        except (ConfigError, FileNotFoundError, FFmpegNotFound, MediaProbeError) as e:
             self._error(HTTPStatus.BAD_REQUEST, str(e))
         except Exception as e:  # noqa: BLE001  最低限のガード（GUIを落とさない）
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"{type(e).__name__}: {e}")
@@ -91,7 +91,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._api_export()
             else:
                 self._error(HTTPStatus.NOT_FOUND, f"not found: {parsed.path}")
-        except (ConfigError, FileNotFoundError, FFmpegNotFound, ValueError) as e:
+        except (ConfigError, FileNotFoundError, FFmpegNotFound, MediaProbeError, ValueError) as e:
             self._error(HTTPStatus.BAD_REQUEST, str(e))
         except Exception as e:  # noqa: BLE001
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"{type(e).__name__}: {e}")

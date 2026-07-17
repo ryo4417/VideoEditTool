@@ -12,7 +12,7 @@ import argparse
 import sys
 
 from core.config import ConfigError, load_config
-from core.ffmpeg import FFmpegNotFound
+from core.ffmpeg import FFmpegNotFound, MediaProbeError
 from pipeline import Pipeline
 
 
@@ -46,10 +46,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         result = Pipeline(config).run(args.input, output_dir=args.output_dir)
-    except FFmpegNotFound as e:
-        print(f"[エラー] {e}", file=sys.stderr)
-        return 2
-    except FileNotFoundError as e:
+    except (FFmpegNotFound, MediaProbeError, FileNotFoundError) as e:
         print(f"[エラー] {e}", file=sys.stderr)
         return 2
 
