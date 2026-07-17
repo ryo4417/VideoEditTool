@@ -108,6 +108,13 @@ class Pipeline:
             outputs.append(
                 exporters.export_edl(media, keep_segments, str(out_dir / f"{stem}.edl"))
             )
+        elif fmt == "html":
+            outputs.append(
+                exporters.export_html(
+                    media, candidates, keep_segments, report.to_dict(),
+                    str(out_dir / f"{stem}.html"),
+                )
+            )
         else:
             raise ValueError(f"未対応の export format: {fmt}")
 

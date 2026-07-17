@@ -45,7 +45,7 @@ quality:
 
 # --- 書き出し ---
 export:
-  format: json                # json | edl
+  format: json                # json | edl | html（編集確認プレビュー）
   output_dir: output
   render: false               # true で ffmpeg による実カット動画を出力
   render_ext: mp4
