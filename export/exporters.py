@@ -58,6 +58,13 @@ def export_json(
     return output_path
 
 
+def export_report(report_dict: dict, output_path: str) -> str:
+    Path(output_path).write_text(
+        json.dumps(report_dict, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return output_path
+
+
 def export_edl(media: MediaInfo, keep_segments: List[TimeRange], output_path: str) -> str:
     lines = ["TITLE: VideoEditTool Export", "FCM: NON-DROP FRAME", ""]
     record = 0.0

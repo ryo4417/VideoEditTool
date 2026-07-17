@@ -17,6 +17,7 @@ from core.models import AnalysisResult, EditCandidate, MediaInfo, TimeRange
 from core.registry import ANALYZERS
 from export import exporters
 from plugins.builtin import load_builtins
+from quality.checker import QualityChecker, QualityReport
 from rules.engine import RuleEngine
 from timeline.manager import TimelineManager
 
@@ -27,6 +28,7 @@ class PipelineResult:
     analysis: AnalysisResult
     candidates: List[EditCandidate]
     keep_segments: List[TimeRange]
+    report: QualityReport
     outputs: List[str] = field(default_factory=list)
 
 
@@ -54,14 +56,19 @@ class Pipeline:
         timeline = tl_manager.build(media, candidates)
         keep_segments = tl_manager.refine_keep_segments(timeline)
 
+        # 4.5 品質チェック（AIなしベースライン。確認・レポート用）
+        checker = QualityChecker(self.config.section("quality"))
+        report = checker.check(media, candidates, keep_segments)
+
         # 5. 書き出し
-        outputs = self._export(media, candidates, keep_segments, output_dir)
+        outputs = self._export(media, candidates, keep_segments, report, output_dir)
 
         return PipelineResult(
             media=media,
             analysis=analysis,
             candidates=candidates,
             keep_segments=keep_segments,
+            report=report,
             outputs=outputs,
         )
 
@@ -77,6 +84,7 @@ class Pipeline:
         media: MediaInfo,
         candidates: List[EditCandidate],
         keep_segments: List[TimeRange],
+        report: QualityReport,
         output_dir: str | None,
     ) -> List[str]:
         export_cfg = self.config.section("export")
@@ -85,6 +93,10 @@ class Pipeline:
         stem = Path(media.path).stem
 
         outputs: List[str] = []
+        if self.config.get("quality.report", False):
+            outputs.append(
+                exporters.export_report(report.to_dict(), str(out_dir / f"{stem}.report.json"))
+            )
         fmt = export_cfg.get("format", "json")
         if fmt == "json":
             outputs.append(

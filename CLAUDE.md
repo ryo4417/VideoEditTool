@@ -65,11 +65,23 @@ python -m pytest
 4. `tests/` にテストを追加
 → エンジンや他モジュールの変更は不要。
 
+## 開発の進め方（監督者方針）
+- 各機能は**まず「最低限動く」形を `main`** に載せる。`main` は常に動く基準線を保つ。
+- 機能改善で**方向性が分かれるときは、既存方針で動くものを先に `main`** に作り、
+  **改善案版は `feature/<名前>` ブランチ**で開発する（例: AIありの品質採点は `feature/ai-quality`）。
+- 迷って決められない場合は、各案を最低限動く形にして**ブランチで並走**させ、`main` は選んだ案で進める。
+- エージェントは継続的に棚卸しする（下記）。**監督者が管理できる範囲**の数に抑える。
+
 ## サブエージェント（`.claude/agents/`）
 - **役割別（実装/管理）**: `project-manager` / `core-architect` / `audio-analyzer` / `rule-engine` / `timeline-engine` / `export-engine` / `ui-engineer` / `qa-agent`（バグ探し） / `doc-agent` / `design-reviewer`（設計全体）
 - **各機能の改善提案係（提案のみ・コードは書かない）**: `improve-core` / `improve-audio` / `improve-rules` / `improve-timeline` / `improve-export` / `improve-ui`
   - 各機能ドメインに特化し「課題→改善案→期待効果→影響範囲→優先度」で提案する。
 
 ## 現状（MVP）
-- 実装済み: 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形 → json/edl/実カット出力。案件プロファイル（youtube / interview）。
-- 未実装（拡張点として枠のみ）: filler / duplicate / restate ルール、speech解析、AI補助、UI詳細、NLE連携。案件内容確定後に実装する。
+- 実装済み:
+  - 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形 → json/edl/実カット出力
+  - 発話区間解析（`audio/speech.py`, 無音の補集合。既定オフの拡張点）
+  - 品質チェッカー（`quality/`, AIなしベースラインの編集レポート＋警告。`--report`）
+  - 案件プロファイル（youtube / interview）
+- 未実装（拡張点として枠のみ / 別ブランチ予定）: filler / duplicate / restate ルール、
+  AI補助（`ai.enabled`。品質採点・改善案は `feature/ai-quality` で開発予定）、UI詳細、NLE連携。

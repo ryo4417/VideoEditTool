@@ -37,6 +37,12 @@ timeline:
   merge_gap_sec: 0.2          # この間隔以下の残す区間は結合
   min_segment_sec: 0.3        # これ未満の残す区間は除去
 
+# --- 品質チェック（AIなしベースライン。編集レポート・確認用）---
+quality:
+  report: false               # true で <入力名>.report.json を出力
+  max_removed_ratio: 0.6      # 削除率がこれを超えると警告
+  warn_min_segment_sec: 0.5   # これ未満の残り区間があると警告
+
 # --- 書き出し ---
 export:
   format: json                # json | edl

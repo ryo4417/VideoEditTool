@@ -24,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="書き出し形式（config を上書き）")
     parser.add_argument("--output-dir", default=None, help="出力先ディレクトリ")
     parser.add_argument("--render", action="store_true", help="ffmpeg で実際にカット動画を書き出す")
+    parser.add_argument("--report", action="store_true", help="品質レポート(json)を書き出す")
     return parser
 
 
@@ -35,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
         config.data.setdefault("export", {})["format"] = args.fmt
     if args.render:
         config.data.setdefault("export", {})["render"] = True
+    if args.report:
+        config.data.setdefault("quality", {})["report"] = True
 
     try:
         result = Pipeline(config).run(args.input, output_dir=args.output_dir)
@@ -45,10 +48,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[エラー] {e}", file=sys.stderr)
         return 2
 
-    cut_count = sum(1 for c in result.candidates if c.action.value == "cut")
+    r = result.report
     print(f"入力: {result.media.path} ({result.media.duration:.1f}s)")
-    print(f"編集候補: {len(result.candidates)} 件 (CUT {cut_count})")
-    print(f"残す区間: {len(result.keep_segments)} 区間")
+    print(f"編集候補: {len(result.candidates)} 件 (CUT {r.num_cuts})")
+    print(f"残す区間: {r.num_segments} 区間 / 残時間 {r.kept_duration:.1f}s (削除率 {r.removed_ratio:.0%})")
+    for w in r.warnings:
+        print(f"[警告] {w}")
     for out in result.outputs:
         print(f"出力: {out}")
     return 0
