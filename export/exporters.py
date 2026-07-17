@@ -17,16 +17,24 @@ from core import ffmpeg
 from core.models import EditAction, EditCandidate, MediaInfo, TimeRange
 
 
+DEFAULT_FPS = 25  # fps 不明時のフォールバック
+
+
+def _fps_int(fps: float) -> int:
+    return int(round(fps)) if fps and fps > 0 else DEFAULT_FPS
+
+
+def _frames_to_tc(total_frames: int, fps_i: int) -> str:
+    """フレーム数を HH:MM:SS:FF に変換。"""
+    frames = total_frames % fps_i
+    total_sec = total_frames // fps_i
+    return f"{total_sec // 3600:02d}:{(total_sec // 60) % 60:02d}:{total_sec % 60:02d}:{frames:02d}"
+
+
 def _timecode(seconds: float, fps: float) -> str:
-    """秒を HH:MM:SS:FF に変換（fps 不明時は 25 と仮定）。"""
-    fps = fps if fps and fps > 0 else 25.0
-    total_frames = round(seconds * fps)
-    frames = int(total_frames % round(fps))
-    total_sec = total_frames // round(fps)
-    s = total_sec % 60
-    m = (total_sec // 60) % 60
-    h = total_sec // 3600
-    return f"{h:02d}:{m:02d}:{s:02d}:{frames:02d}"
+    """秒を HH:MM:SS:FF に変換（fps 不明時は DEFAULT_FPS）。"""
+    fps_i = _fps_int(fps)
+    return _frames_to_tc(round(seconds * fps_i), fps_i)
 
 
 def export_json(
@@ -68,15 +76,19 @@ def export_report(report_dict: dict, output_path: str) -> str:
 
 
 def export_edl(media: MediaInfo, keep_segments: List[TimeRange], output_path: str) -> str:
+    fps_i = _fps_int(media.fps)
     lines = ["TITLE: VideoEditTool Export", "FCM: NON-DROP FRAME", ""]
-    record = 0.0
+    rec_frames = 0
     for i, seg in enumerate(keep_segments, start=1):
-        src_in = _timecode(seg.start, media.fps)
-        src_out = _timecode(seg.end, media.fps)
-        rec_in = _timecode(record, media.fps)
-        rec_out = _timecode(record + seg.duration, media.fps)
+        src_in_f = round(seg.start * fps_i)
+        src_out_f = round(seg.end * fps_i)
+        length_f = src_out_f - src_in_f  # 記録側の長さはソース側フレーム長から導出（一致保証）
+        src_in = _frames_to_tc(src_in_f, fps_i)
+        src_out = _frames_to_tc(src_out_f, fps_i)
+        rec_in = _frames_to_tc(rec_frames, fps_i)
+        rec_out = _frames_to_tc(rec_frames + length_f, fps_i)
         lines.append(f"{i:03d}  AX       V     C        {src_in} {src_out} {rec_in} {rec_out}")
-        record += seg.duration
+        rec_frames += length_f
     Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
 
@@ -94,20 +106,24 @@ def build_fcpxml(media: MediaInfo, keep_segments: List[TimeRange]) -> str:
     keep 区間を spine 上の asset-clip として並べる。offset=タイムライン位置、
     start=素材の頭出し、duration=区間長。時間は秒(小数)表記。
     """
-    fps = int(round(media.fps)) if media.fps and media.fps > 0 else 25
+    fps = _fps_int(media.fps)
     name = Path(media.path).stem
     width = media.width or 1920
     height = media.height or 1080
 
+    # FCPXML は有理数時刻(N/fps s)＝フレーム境界に厳格。小数秒累積のドリフトを避ける。
     clips: List[str] = []
-    offset = 0.0
+    offset_f = 0
     for seg in keep_segments:
+        start_f = round(seg.start * fps)
+        length_f = round(seg.end * fps) - start_f
         clips.append(
             f'        <asset-clip ref="r2" name={quoteattr(name)} '
-            f'offset="{offset:.3f}s" start="{seg.start:.3f}s" duration="{seg.duration:.3f}s"/>'
+            f'offset="{offset_f}/{fps}s" start="{start_f}/{fps}s" duration="{length_f}/{fps}s"/>'
         )
-        offset += seg.duration
-    total = offset
+        offset_f += length_f
+    total_f = offset_f
+    dur_f = round(media.duration * fps)
 
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -117,14 +133,14 @@ def build_fcpxml(media: MediaInfo, keep_segments: List[TimeRange]) -> str:
         f'    <format id="r1" name="FFVideoFormat" frameDuration="1/{fps}s" '
         f'width="{width}" height="{height}"/>\n'
         f'    <asset id="r2" name={quoteattr(name)} start="0s" '
-        f'duration="{media.duration:.3f}s" hasVideo="1" hasAudio="1" format="r1">\n'
+        f'duration="{dur_f}/{fps}s" hasVideo="1" hasAudio="1" format="r1">\n'
         f"      <media-rep kind=\"original-media\" src={quoteattr(_file_uri(media.path))}/>\n"
         "    </asset>\n"
         "  </resources>\n"
         "  <library>\n"
         '    <event name="VideoEditTool">\n'
         f"      <project name={quoteattr(name + ' (edited)')}>\n"
-        f'        <sequence format="r1" duration="{total:.3f}s">\n'
+        f'        <sequence format="r1" duration="{total_f}/{fps}s">\n'
         "          <spine>\n"
         + "\n".join(clips)
         + "\n          </spine>\n"

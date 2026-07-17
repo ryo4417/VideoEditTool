@@ -17,10 +17,13 @@ def test_fcpxml_is_wellformed_and_has_clips():
 
     clips = root.findall(".//asset-clip")
     assert len(clips) == 2
-    # 2つ目のクリップの offset は1つ目の duration(4s)分ずれる
-    assert clips[1].get("offset") == "4.000s"
-    assert clips[0].get("start") == "0.000s"
-    assert clips[1].get("start") == "6.000s"
+    # 有理数(フレーム)表記。fps=25 で keep [0,4),[6,10)
+    assert clips[0].get("start") == "0/25s"
+    assert clips[1].get("start") == "150/25s"   # 6s * 25
+    assert clips[1].get("offset") == "100/25s"  # 1つ目の長さ 4s * 25
+    # 各クリップの offset+duration が次の offset に一致（ギャップ/重複なし）
+    o0, d0 = clips[0].get("offset"), clips[0].get("duration")
+    assert o0 == "0/25s" and d0 == "100/25s"
 
 
 def test_fcpxml_frameduration_from_fps():
