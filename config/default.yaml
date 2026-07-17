@@ -39,8 +39,11 @@ rules:
     enabled: false
     min_words: 1              # 検出する繰り返し語句の最小語数
     max_words: 6              # 同上・最大語数
-  restate:                    # 言い直し（拡張点。開発中）
+  restate:                    # 言い直し【方式B: 類似句】（要 transcript）
     enabled: false
+    min_words: 2
+    max_words: 6
+    sim_threshold: 0.5        # 隣接句の語の共有率がこれ以上なら言い直しとみなす
 
 # --- タイムライン整形 ---
 timeline:
