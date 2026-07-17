@@ -72,10 +72,11 @@ python -m pytest
 - 迷って決められない場合は、各案を最低限動く形にして**ブランチで並走**させ、`main` は選んだ案で進める。
 - エージェントは継続的に棚卸しする（下記）。**監督者が管理できる範囲**の数に抑える。
 
-## サブエージェント（`.claude/agents/`）
+## サブエージェント（`.claude/agents/`）— 計11種
 - **役割別（実装/管理）**: `project-manager` / `core-architect` / `audio-analyzer` / `rule-engine` / `timeline-engine` / `export-engine` / `ui-engineer` / `qa-agent`（バグ探し） / `doc-agent` / `design-reviewer`（設計全体）
-- **各機能の改善提案係（提案のみ・コードは書かない）**: `improve-core` / `improve-audio` / `improve-rules` / `improve-timeline` / `improve-export` / `improve-ui`
-  - 各機能ドメインに特化し「課題→改善案→期待効果→影響範囲→優先度」で提案する。
+- **改善提案（汎用・提案のみ）**: `improver` — 対象機能を指定して使う（例:「improver で audio を改善」）。
+  「課題→改善案→期待効果→影響範囲→優先度」で上位3件を提示。
+- 方針: 監督者が管理できる範囲に数を抑える。不要になったものは畳み、必要な領域だけ増やす。
 
 ## 現状（MVP）
 - 実装済み:
