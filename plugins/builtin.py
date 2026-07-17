@@ -9,6 +9,7 @@ from audio import speech as _speech  # noqa: F401
 from audio import transcript as _transcript  # noqa: F401
 from rules import duplicate_rule as _duplicate_rule  # noqa: F401
 from rules import filler_rule as _filler_rule  # noqa: F401
+from rules import restate_rule as _restate_rule  # noqa: F401
 from rules import silence_rule as _silence_rule  # noqa: F401
 
 
