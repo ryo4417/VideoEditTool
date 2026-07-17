@@ -28,6 +28,8 @@ class QualityReport:
     longest_segment: float
     warnings: List[str] = field(default_factory=list)
     ai_assisted: bool = False
+    ai_score: float | None = None                    # ローカルLLMの採点（任意）
+    ai_suggestions: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

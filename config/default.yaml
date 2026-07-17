@@ -63,6 +63,9 @@ export:
   render: false               # true で ffmpeg による実カット動画を出力
   render_ext: mp4
 
-# --- AI（補助のみ・既定オフ。仕様書 §9）---
+# --- AI（補助のみ・既定オフ。仕様書 §9）ローカルLLM(Ollama) ---
 ai:
   enabled: false              # 品質採点・編集漏れ確認・改善案などに限定
+  provider: ollama            # ollama | null
+  model: llama3.1             # Ollama のモデル名（ollama pull で用意）
+  host: "http://localhost:11434"

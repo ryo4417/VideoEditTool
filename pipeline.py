@@ -17,6 +17,7 @@ from core.models import AnalysisResult, EditCandidate, MediaInfo, TimeRange
 from core.registry import ANALYZERS
 from export import exporters
 from plugins.builtin import load_builtins
+from quality.ai_assist import NullAssessor, get_assessor
 from quality.checker import QualityChecker, QualityReport
 from rules.engine import RuleEngine
 from timeline.manager import TimelineManager
@@ -57,6 +58,17 @@ class Pipeline:
 
         # 4-4.5 タイムライン整形 + 品質チェック
         keep_segments, report = self._keep_and_report(media, candidates)
+
+        # 4.6 AI補助（任意・ローカルLLM）。無効時は何もしない＝ベースラインのまま。
+        #     AIは補助のため、失敗しても編集は成立させる（警告に載せるだけ）。
+        assessor = get_assessor(self.config.section("ai"))
+        if not isinstance(assessor, NullAssessor):
+            assessment = assessor.assess(media, candidates, keep_segments, report)
+            report.ai_assisted = True
+            report.ai_score = assessment.score
+            report.ai_suggestions = assessment.suggestions + assessment.missed_edits
+            if assessment.error:
+                report.warnings.append(f"AI補助: {assessment.error}")
 
         return PipelineResult(
             media=media,
