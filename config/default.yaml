@@ -14,6 +14,9 @@ analysis:
     enabled: true
     noise_threshold_db: -30   # これ以下(dB)を無音とみなす
     min_silence_sec: 0.5      # これ以上続く無音のみ検出
+  speech:                     # 発話区間 = 無音の補集合（最低限動く版）
+    enabled: false            # 消費するルール実装後に有効化
+    min_speech_sec: 0.2       # これ未満の発話断片は除外
 
 # --- 編集ルール: name ごとに enabled で ON/OFF ---
 rules:

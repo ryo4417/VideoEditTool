@@ -77,6 +77,26 @@ class EditCandidate:
     confidence: float = 1.0
 
 
+def complement_ranges(
+    ranges: List[TimeRange], total: float, start: float = 0.0
+) -> List[TimeRange]:
+    """[start, total] 区間から ranges を除いた補集合を返す。
+
+    無音→発話、カット→残す区間 のように「区間の反転」を共通化する。
+    """
+    ordered = sorted(ranges, key=lambda r: r.start)
+    segments: List[TimeRange] = []
+    cursor = start
+    for r in ordered:
+        s = max(r.start, start)
+        if s > cursor:
+            segments.append(TimeRange(cursor, s))
+        cursor = max(cursor, min(r.end, total))
+    if cursor < total:
+        segments.append(TimeRange(cursor, total))
+    return segments
+
+
 @dataclass
 class Timeline:
     """編集タイムライン。カット区間から残す区間（keep）を導出する。"""
@@ -86,14 +106,4 @@ class Timeline:
 
     def keep_segments(self) -> List[TimeRange]:
         """カットの補集合 = 残す区間。"""
-        ordered = sorted(self.cuts, key=lambda r: r.start)
-        segments: List[TimeRange] = []
-        cursor = 0.0
-        for cut in ordered:
-            start = max(cut.start, 0.0)
-            if start > cursor:
-                segments.append(TimeRange(cursor, start))
-            cursor = max(cursor, min(cut.end, self.media.duration))
-        if cursor < self.media.duration:
-            segments.append(TimeRange(cursor, self.media.duration))
-        return segments
+        return complement_ranges(self.cuts, self.media.duration)
