@@ -37,6 +37,25 @@ def test_padding_applied():
     assert round(candidates[0].time_range.end, 3) == 2.5
 
 
+def test_multiword_filler_phrase():
+    # 「you know」の複数語フィラーが1件のCUTになる（従来は空振りだった）
+    words = [
+        Word(0.0, 0.4, "I"), Word(0.4, 0.7, "think"),
+        Word(0.7, 1.0, "you"), Word(1.0, 1.4, "know"),
+        Word(1.4, 1.8, "it"),
+    ]
+    cands = FillerRule({"words": ["you know"]}).apply(_analysis_with_words(words))
+    assert len(cands) == 1
+    assert cands[0].time_range.start == 0.7 and cands[0].time_range.end == 1.4
+    assert "you know" in cands[0].reason  # 語間スペースが復元される
+
+
+def test_reason_has_readable_spacing():
+    words = [Word(0.0, 0.4, "um")]
+    cands = FillerRule({"words": ["um"]}).apply(_analysis_with_words(words))
+    assert cands[0].reason == "フィラー「um」"
+
+
 def test_no_words_no_candidates():
     media = MediaInfo(path="x.mp4", duration=10.0, has_audio=True)
     assert FillerRule().apply(AnalysisResult(media=media)) == []

@@ -6,19 +6,15 @@
 """
 from __future__ import annotations
 
-import re
 from typing import List
 
 from core.models import AnalysisResult, EditAction, EditCandidate, TimeRange
 from core.registry import RULES
 from core.rule import BaseRule
+from rules._text import join_words, normalize_word as _normalize
 
 DEFAULT_MIN_WORDS = 1
 DEFAULT_MAX_WORDS = 6
-
-
-def _normalize(text: str) -> str:
-    return re.sub(r"[\s、。,.!?！？]+", "", text).lower()
 
 
 @RULES.register("duplicate")
@@ -42,7 +38,7 @@ class DuplicateRule(BaseRule):
                     continue
                 first, second = norm[i:i + w], norm[i + w:i + 2 * w]
                 if first == second and all(first):
-                    phrase = "".join(words[j].text for j in range(i, i + w))
+                    phrase = join_words([words[j].text for j in range(i, i + w)])
                     candidates.append(
                         EditCandidate(
                             time_range=TimeRange(words[i].start, words[i + w - 1].end),
