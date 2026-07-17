@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from core.config import load_config
+from core.config import ConfigError, load_config
 from core.ffmpeg import FFmpegNotFound
 from pipeline import Pipeline
 
@@ -31,7 +31,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    config = load_config(args.profile)
+    try:
+        config = load_config(args.profile)
+    except (ConfigError, FileNotFoundError) as e:
+        print(f"[設定エラー] {e}", file=sys.stderr)
+        return 2
     if args.fmt:
         config.data.setdefault("export", {})["format"] = args.fmt
     if args.render:
