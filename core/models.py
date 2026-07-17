@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 @dataclass(frozen=True)
@@ -49,10 +49,14 @@ class AnalysisResult:
     features は「特徴名 -> 区間リスト」の汎用辞書。
     アナライザは既存キーに縛られず新しい特徴を追加できる（拡張ポイント）。
     例: {"silence": [...], "speech": [...]}
+
+    data は区間以外の付随情報（文字起こしの単語列など）を置く汎用辞書。
+    例: {"words": [Word(...), ...]}
     """
 
     media: MediaInfo
     features: Dict[str, List[TimeRange]] = field(default_factory=dict)
+    data: Dict[str, Any] = field(default_factory=dict)
 
     def add(self, feature: str, ranges: List[TimeRange]) -> None:
         self.features.setdefault(feature, []).extend(ranges)

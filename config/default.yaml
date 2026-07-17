@@ -17,6 +17,13 @@ analysis:
   speech:                     # 発話区間 = 無音の補集合（最低限動く版）
     enabled: false            # 消費するルール実装後に有効化
     min_speech_sec: 0.2       # これ未満の発話断片は除外
+  transcript:                 # ローカルWhisperによる文字起こし（内容ベースのルール用）
+    enabled: false            # 有効化には faster-whisper が必要（重い依存）
+    provider: whisper         # whisper | null
+    model: base               # tiny/base/small/medium/large-v3 など
+    language: ja              # 言語（null で自動判定）
+    device: cpu               # cpu | cuda
+    compute_type: int8        # int8/float16 など
 
 # --- 編集ルール: name ごとに enabled で ON/OFF ---
 rules:
@@ -24,9 +31,11 @@ rules:
     enabled: true
     min_cut_sec: 0.5          # この長さを超える無音のみカット
     keep_padding_sec: 0.1     # 発話前後に残す余白
-  # 以下は未実装ルールの拡張点（仕様確定後に実装）。
-  filler:
-    enabled: false
+  filler:                     # フィラー除去（要 transcript）
+    enabled: false            # analysis.transcript を有効化してから使う
+    words: ["えー", "えーと", "えっと", "あのー", "あの", "あー", "まあ", "その", "um", "uh", "er"]
+    padding_sec: 0.0
+  # 以下は未実装ルールの拡張点（内容解析が必要。案件確定後に実装）。
   duplicate:
     enabled: false
   restate:                    # 言い直し
