@@ -82,16 +82,15 @@ python -m pytest
 - 実装済み（main）:
   - **ローカルWeb GUI**（`ui/web/`, 追加依存なし）: 動画プレビュー・色分けタイムライン・
     候補トグルで削除率ライブ更新・書き出し。起動 `python -m ui.web.server`。
-  - 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形
-  - **ローカルWhisper文字起こし**（`audio/transcribe.py`+`transcript.py`, faster-whisper任意依存）
-    → **フィラー除去ルール**（`rules/filler_rule.py`, 対象語はconfig管理）
-  - 書き出し: json / edl / html / fcpxml / 実カット動画
-  - 発話区間解析、品質チェッカー（`quality/`, `--report`）、config スキーマ検証
-  - 案件プロファイル（youtube / interview）。テスト 51 passed。
-  - 重複除去 / 言い直し(方式B) ルール（内容ベース）
+  - カット編集ルール（内容/無音ベース・すべてconfigでON/OFF）:
+    無音 / テンポ(間の短縮) / フィラー(複数語句可) / 重複 / 言い直し(方式B)
+  - **ローカルWhisper文字起こし**（`audio/transcribe.py`+`transcript.py`, faster-whisper任意依存・モデルキャッシュ）
+  - 書き出し: json / edl(V+音声) / html / fcpxml / 実カット動画。CLIは解析1回で複数形式出力
+  - 発話区間解析、品質チェッカー（`quality/`, `--report`）、config スキーマ検証（型・未知キー・負値・不正format）
   - **AI品質採点（ローカルLLM / Ollama）**（`quality/ai_assist.py`, 既定オフ・オフライン・補助）
-  - GUI: 波形表示・解析オプション選択。テスト 72 passed。
-- 保留: テンポ調整（仕様が割れるため要判断）、案件マニュアル学習（マニュアル未提供）。
+  - 案件プロファイル（youtube / interview）。GUI: 波形・解析オプション・言語選択・文字起こし可視化。
+  - テスト件数は `python -m pytest` を参照（CIでも実行）。
+- 保留: 案件マニュアル学習（マニュアル未提供）、編集後プレビュー再生・進捗表示・バッチ入力（拡張候補）。
 
 ## パイプラインAPI（`pipeline.Pipeline`）
 - `analyze(path)` → 書き出さず解析結果を返す（GUI用）
