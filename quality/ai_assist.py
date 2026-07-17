@@ -90,12 +90,24 @@ class OllamaAssessor(AIQualityAssessor):
         except (json.JSONDecodeError, TypeError):
             return AIAssessment(provider="ollama", error="LLM応答をJSONとして解釈できませんでした",
                                 suggestions=[text.strip()[:200]] if text else [])
+        # 未信頼な入力（文字起こし＋LLM）なので範囲・件数・長さを制限する。
         score = data.get("score")
+        score = min(100.0, max(0.0, float(score))) if isinstance(score, (int, float)) else None
+
+        def _clean(items):
+            out = []
+            for s in items if isinstance(items, list) else []:
+                if s:
+                    out.append(str(s)[:300])
+                if len(out) >= 10:
+                    break
+            return out
+
         return AIAssessment(
             provider="ollama",
-            score=float(score) if isinstance(score, (int, float)) else None,
-            suggestions=[str(s) for s in data.get("suggestions", []) if s],
-            missed_edits=[str(s) for s in data.get("missed_edits", []) if s],
+            score=score,
+            suggestions=_clean(data.get("suggestions")),
+            missed_edits=_clean(data.get("missed_edits")),
         )
 
 
@@ -110,5 +122,6 @@ def get_assessor(ai_config: Dict[str, Any]) -> AIQualityAssessor:
         return OllamaAssessor(
             model=ai_config.get("model", "llama3.1"),
             host=ai_config.get("host", "http://localhost:11434"),
+            timeout=float(ai_config.get("timeout", 60.0)),
         )
     raise NotImplementedError(f"未対応のAIプロバイダ: '{provider}'")

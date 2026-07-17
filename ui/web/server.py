@@ -64,8 +64,18 @@ def _result_json(result: PipelineResult) -> dict:
 class Handler(BaseHTTPRequestHandler):
     server_version = "VideoEditToolGUI/0.1"
 
+    def _check_host(self) -> bool:
+        """Hostヘッダが loopback のみ許可（DNSリバインディング対策）。"""
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+        if host in ("127.0.0.1", "localhost", "::1", ""):
+            return True
+        self._error(HTTPStatus.FORBIDDEN, "ローカル(loopback)以外からのアクセスは拒否します")
+        return False
+
     # --- ルーティング ---
     def do_GET(self) -> None:
+        if not self._check_host():
+            return
         parsed = urlparse(self.path)
         route = parsed.path
         # keep_blank_values: 「rules=（空）」を「全ルールOFF」として区別するため
@@ -90,6 +100,8 @@ class Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, f"{type(e).__name__}: {e}")
 
     def do_POST(self) -> None:
+        if not self._check_host():
+            return
         parsed = urlparse(self.path)
         try:
             if parsed.path == "/api/export":
@@ -146,8 +158,10 @@ class Handler(BaseHTTPRequestHandler):
         fmt = body.get("format", "json")
         render = bool(body.get("render", False))
         enabled = body.get("enabled_indices")
+        if enabled is not None and not isinstance(enabled, list):
+            raise ValueError("enabled_indices は配列で指定してください")
         profile = body.get("profile") or None
-        output_dir = body.get("output_dir") or None
+        output_dir = _safe_output_dir(body.get("output_dir"))
 
         with _CACHE_LOCK:
             cached = _CACHE.get(path)
@@ -238,6 +252,19 @@ class Handler(BaseHTTPRequestHandler):
 def _one(params: dict, key: str) -> str:
     values = params.get(key)
     return values[0] if values else ""
+
+
+# GUIからの出力先は作業ディレクトリ配下に限定（任意パスへの書き込みを防ぐ）。
+_BASE_DIR = Path.cwd().resolve()
+
+
+def _safe_output_dir(value):
+    if not value:
+        return None
+    resolved = (Path(value) if os.path.isabs(value) else _BASE_DIR / value).resolve()
+    if resolved != _BASE_DIR and _BASE_DIR not in resolved.parents:
+        raise ValueError(f"出力先は作業ディレクトリ配下に限定されます: {value}")
+    return str(resolved)
 
 
 def serve(port: int = 8000, open_browser: bool = True) -> None:

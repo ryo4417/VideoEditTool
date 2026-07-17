@@ -26,7 +26,7 @@ _FIXED_SCHEMA: Dict[str, Dict[str, Union[Type, Tuple[Type, ...]]]] = {
     "quality": {"report": bool, "max_removed_ratio": _NUM, "warn_min_segment_sec": _NUM},
     "export": {"format": str, "output_dir": str, "render": bool, "render_ext": str,
                "stem_suffix": str},
-    "ai": {"enabled": bool, "provider": str, "model": str, "host": str},
+    "ai": {"enabled": bool, "provider": str, "model": str, "host": str, "timeout": _NUM},
 }
 # 開放セクション: 子キーはプラグイン名（任意）。子は dict で、enabled があれば bool。
 _OPEN_SECTIONS = {"analysis", "rules"}
@@ -130,6 +130,8 @@ def validate_config(data: Dict[str, Any]) -> List[str]:
                     f"型違反: '{section}.{key}' は {_type_name(schema[key])} "
                     f"であるべきですが {type(v).__name__} です"
                 )
+            elif schema[key] == _NUM and isinstance(v, _NUM) and v < 0:
+                errors.append(f"負値は不可: '{section}.{key}' = {v}")
 
     fmt = data.get("export", {}).get("format")
     if fmt is not None and fmt not in _ALLOWED_FORMATS:
