@@ -42,7 +42,9 @@ def probe(path: str) -> MediaInfo:
         FFPROBE, "-v", "error", "-print_format", "json",
         "-show_format", "-show_streams", path,
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    # ffprobe は UTF-8 で出力する。text=True 既定のロケール(cp932 等)復号だと
+    # 日本語を含むパスで JSON が壊れるため、UTF-8 を明示する。
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
         detail = (proc.stderr or "").strip() or "ffprobe が失敗しました"
         raise MediaProbeError(f"メディアを読めません: {path}\n  {detail}")
@@ -90,8 +92,8 @@ def detect_silence(path: str, noise_db: float, min_silence_sec: float) -> List[T
         "-af", f"silencedetect=noise={noise_db}dB:d={min_silence_sec}",
         "-f", "null", "-",
     ]
-    # silencedetect は stderr にログを出す。
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    # silencedetect は stderr にログを出す。UTF-8 を明示（日本語パス対策）。
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return _parse_silence_log(result.stderr)
 
 
@@ -171,4 +173,4 @@ def render_cuts(path: str, keep_segments: List[TimeRange], output_path: str) -> 
         "-map", "[outv]", "-map", "[outa]",
         output_path,
     ]
-    subprocess.run(cmd, capture_output=True, text=True, check=True)
+    subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
