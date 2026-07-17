@@ -3,6 +3,14 @@
 動画のカット編集を効率化する汎用の**動画カット編集支援ツール**。
 編集は独自アルゴリズム（ルールエンジン）で行い、AIは補助（品質確認・改善提案）に限定する。
 
+## すぐ試す
+```powershell
+cd ~\Desktop\VideoEditTool
+.\start.ps1 -Sample            # 依存導入＋サンプル生成＋GUI起動
+# フィラー/重複/言い直しも試すなら:  .\start.ps1 -WithWhisper -Sample
+```
+詳しい操作は [docs/使い方.md](docs/使い方.md) を参照。
+
 ## 必要環境
 - Python 3.11+
 - ffmpeg / ffprobe（PATH に通す）
