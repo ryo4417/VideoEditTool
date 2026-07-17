@@ -24,7 +24,7 @@ def _make_tone(tmp_path):
 
 def test_waveform_returns_normalized_peaks(tmp_path):
     peaks = ffmpeg.extract_waveform(_make_tone(tmp_path), buckets=100)
-    assert 0 < len(peaks) <= 100
+    assert len(peaks) == 100  # ちょうど buckets 個・全尺カバー（末尾欠落なし）
     assert all(0.0 <= p <= 1.0 for p in peaks)
     assert max(peaks) == pytest.approx(1.0, abs=1e-6)  # 正規化で最大=1
 

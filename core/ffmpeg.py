@@ -26,6 +26,14 @@ class MediaProbeError(RuntimeError):
     """メディアを読めない（破損・非対応・動画でない等）。"""
 
 
+def _run(cmd, timeout, **kw):
+    """タイムアウト付きで外部プロセスを実行（ハング防止）。超過は分かりやすく失敗。"""
+    try:
+        return subprocess.run(cmd, timeout=timeout, **kw)
+    except subprocess.TimeoutExpired as e:
+        raise MediaProbeError(f"処理がタイムアウトしました（{timeout}s）: {cmd[0]}") from e
+
+
 def ensure_available() -> None:
     """ffmpeg / ffprobe が PATH 上にあることを確認する。"""
     for exe in (FFMPEG, FFPROBE):
@@ -44,7 +52,7 @@ def probe(path: str) -> MediaInfo:
     ]
     # ffprobe は UTF-8 で出力する。text=True 既定のロケール(cp932 等)復号だと
     # 日本語を含むパスで JSON が壊れるため、UTF-8 を明示する。
-    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    proc = _run(cmd, 120, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
         detail = (proc.stderr or "").strip() or "ffprobe が失敗しました"
         raise MediaProbeError(f"メディアを読めません: {path}\n  {detail}")
@@ -93,7 +101,7 @@ def detect_silence(path: str, noise_db: float, min_silence_sec: float) -> List[T
         "-f", "null", "-",
     ]
     # silencedetect は stderr にログを出す。UTF-8 を明示（日本語パス対策）。
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    result = _run(cmd, 1800, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return _parse_silence_log(result.stderr)
 
 
@@ -124,7 +132,7 @@ def extract_waveform(path: str, buckets: int = 400, sample_rate: int = 4000) -> 
         return []
     cmd = [FFMPEG, "-v", "error", "-i", path, "-ac", "1", "-ar", str(sample_rate),
            "-f", "s16le", "-"]
-    proc = subprocess.run(cmd, capture_output=True)
+    proc = _run(cmd, 600, capture_output=True)
     raw = proc.stdout
     if not raw:
         return []
@@ -133,15 +141,17 @@ def extract_waveform(path: str, buckets: int = 400, sample_rate: int = 4000) -> 
     n = len(samples)
     if n == 0:
         return []
-    size = max(1, n // buckets)
+    # ちょうど buckets 個に均等分割し、全尺をカバーする（末尾欠落を防ぐ）。
     peaks: List[float] = []
-    for start in range(0, n, size):
-        chunk = samples[start:start + size]
+    for i in range(buckets):
+        a = i * n // buckets
+        b = max(a + 1, (i + 1) * n // buckets)
+        chunk = samples[a:b]
         peaks.append(max((abs(s) for s in chunk), default=0) / 32768.0)
     peak_max = max(peaks) if peaks else 0.0
     if peak_max > 0:
         peaks = [round(p / peak_max, 4) for p in peaks]
-    return peaks[:buckets]
+    return peaks
 
 
 def render_cuts(path: str, keep_segments: List[TimeRange], output_path: str) -> None:
@@ -167,10 +177,25 @@ def render_cuts(path: str, keep_segments: List[TimeRange], output_path: str) -> 
     filters.append("".join(concat_inputs) + f"concat=n={n}:v=1:a=1[outv][outa]")
     filter_complex = ";".join(filters)
 
-    cmd = [
-        FFMPEG, "-y", "-i", path,
-        "-filter_complex", filter_complex,
-        "-map", "[outv]", "-map", "[outa]",
-        output_path,
-    ]
-    subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
+    # カット数が多いとコマンド引数が長くなり Windows の上限に達するため、
+    # フィルタは一時ファイルに書き -filter_complex_script で渡す。
+    import os
+    import tempfile
+
+    fd, script_path = tempfile.mkstemp(suffix=".txt", prefix="vet_filter_")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(filter_complex)
+        cmd = [
+            FFMPEG, "-y", "-i", path,
+            "-filter_complex_script", script_path,
+            "-map", "[outv]", "-map", "[outa]",
+            output_path,
+        ]
+        _run(cmd, 3600, capture_output=True, text=True, encoding="utf-8",
+             errors="replace", check=True)
+    finally:
+        try:
+            os.remove(script_path)
+        except OSError:
+            pass
