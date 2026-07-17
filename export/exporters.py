@@ -87,7 +87,10 @@ def export_edl(media: MediaInfo, keep_segments: List[TimeRange], output_path: st
         src_out = _frames_to_tc(src_out_f, fps_i)
         rec_in = _frames_to_tc(rec_frames, fps_i)
         rec_out = _frames_to_tc(rec_frames + length_f, fps_i)
-        lines.append(f"{i:03d}  AX       V     C        {src_in} {src_out} {rec_in} {rec_out}")
+        tc = f"{src_in} {src_out} {rec_in} {rec_out}"
+        # 映像(V)と音声(AA=ステレオ)の両トラックを出力（対談/インタビュー用途で音声必須）。
+        lines.append(f"{i:03d}  AX       V     C        {tc}")
+        lines.append(f"{i:03d}  AX       AA    C        {tc}")
         rec_frames += length_f
     Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path

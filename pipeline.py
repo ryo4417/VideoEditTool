@@ -59,10 +59,12 @@ class Pipeline:
         # 4-4.5 タイムライン整形 + 品質チェック
         keep_segments, report = self._keep_and_report(media, candidates)
 
-        # 設定の矛盾に気づけるよう警告（silence と tempo は同じ無音を別方針で扱う）。
-        if self.config.get("rules.silence.enabled") and self.config.get("rules.tempo.enabled"):
+        # silence と tempo のカットが実際に重なった時だけ警告（設定だけの空振り警告は出さない）。
+        sil = [c.time_range for c in candidates if c.rule == "silence"]
+        tmp = [c.time_range for c in candidates if c.rule == "tempo"]
+        if any(a.overlaps(b) for a in sil for b in tmp):
             report.warnings.append(
-                "silence と tempo を同時に有効化しています（無音の扱いが競合する可能性）。"
+                "silence と tempo のカットが重複しています（無音の扱いが競合する可能性）。"
             )
 
         # 4.6 AI補助（任意・ローカルLLM）。無効時は何もしない＝ベースラインのまま。

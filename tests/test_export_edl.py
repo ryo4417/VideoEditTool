@@ -20,7 +20,10 @@ def test_edl_src_length_equals_rec_length(tmp_path):
 
     fps_i = _fps_int(25.0)
     edit_lines = [ln for ln in text.splitlines() if re.match(r"^\d{3}\s", ln)]
-    assert len(edit_lines) == 3
+    # 各クリップに V と AA の2行 → 3クリップで6行。音声トラックが出ていること。
+    assert len(edit_lines) == 6
+    assert sum(1 for ln in edit_lines if " V " in ln) == 3
+    assert sum(1 for ln in edit_lines if " AA " in ln) == 3
     for ln in edit_lines:
         tcs = re.findall(r"\d{2}:\d{2}:\d{2}:\d{2}", ln)
         src_in, src_out, rec_in, rec_out = tcs
@@ -38,7 +41,7 @@ def test_edl_records_are_contiguous(tmp_path):
     fps_i = _fps_int(30.0)
     recs = []
     for ln in text.splitlines():
-        if re.match(r"^\d{3}\s", ln):
+        if re.match(r"^\d{3}\s", ln) and " V " in ln:  # Vトラックのみで連続性を確認
             tcs = re.findall(r"\d{2}:\d{2}:\d{2}:\d{2}", ln)
             recs.append((_tc_to_frames(tcs[2], fps_i), _tc_to_frames(tcs[3], fps_i)))
     # 記録トラックは隙間なく連続（前のrec_out == 次のrec_in）
