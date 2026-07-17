@@ -35,10 +35,11 @@ rules:
     enabled: false            # analysis.transcript を有効化してから使う
     words: ["えー", "えーと", "えっと", "あのー", "あの", "あー", "まあ", "その", "um", "uh", "er"]
     padding_sec: 0.0
-  # 以下は未実装ルールの拡張点（内容解析が必要。案件確定後に実装）。
-  duplicate:
+  duplicate:                  # 重複除去（要 transcript）
     enabled: false
-  restate:                    # 言い直し
+    min_words: 1              # 検出する繰り返し語句の最小語数
+    max_words: 6              # 同上・最大語数
+  restate:                    # 言い直し（拡張点。開発中）
     enabled: false
 
 # --- タイムライン整形 ---
