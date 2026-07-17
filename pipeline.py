@@ -115,6 +115,10 @@ class Pipeline:
                     str(out_dir / f"{stem}.html"),
                 )
             )
+        elif fmt == "fcpxml":
+            outputs.append(
+                exporters.export_fcpxml(media, keep_segments, str(out_dir / f"{stem}.fcpxml"))
+            )
         else:
             raise ValueError(f"未対応の export format: {fmt}")
 

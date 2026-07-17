@@ -20,7 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="動画カット編集支援ツール")
     parser.add_argument("input", help="入力動画ファイル")
     parser.add_argument("--profile", default=None, help="案件プロファイル名 (config/profiles/*.yaml)")
-    parser.add_argument("--format", dest="fmt", default=None, choices=["json", "edl", "html"],
+    parser.add_argument("--format", dest="fmt", default=None,
+                        choices=["json", "edl", "html", "fcpxml"],
                         help="書き出し形式（config を上書き）")
     parser.add_argument("--output-dir", default=None, help="出力先ディレクトリ")
     parser.add_argument("--render", action="store_true", help="ffmpeg で実際にカット動画を書き出す")

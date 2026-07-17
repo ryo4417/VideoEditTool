@@ -11,6 +11,7 @@ import html
 import json
 from pathlib import Path
 from typing import List
+from xml.sax.saxutils import quoteattr
 
 from core import ffmpeg
 from core.models import EditAction, EditCandidate, MediaInfo, TimeRange
@@ -77,6 +78,66 @@ def export_edl(media: MediaInfo, keep_segments: List[TimeRange], output_path: st
         lines.append(f"{i:03d}  AX       V     C        {src_in} {src_out} {rec_in} {rec_out}")
         record += seg.duration
     Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return output_path
+
+
+def _file_uri(path: str) -> str:
+    try:
+        return Path(path).absolute().as_uri()
+    except (ValueError, OSError):
+        return path
+
+
+def build_fcpxml(media: MediaInfo, keep_segments: List[TimeRange]) -> str:
+    """簡易 FCPXML(v1.9) を組み立てる（NLE連携の最低限動く版）。
+
+    keep 区間を spine 上の asset-clip として並べる。offset=タイムライン位置、
+    start=素材の頭出し、duration=区間長。時間は秒(小数)表記。
+    """
+    fps = int(round(media.fps)) if media.fps and media.fps > 0 else 25
+    name = Path(media.path).stem
+    width = media.width or 1920
+    height = media.height or 1080
+
+    clips: List[str] = []
+    offset = 0.0
+    for seg in keep_segments:
+        clips.append(
+            f'        <asset-clip ref="r2" name={quoteattr(name)} '
+            f'offset="{offset:.3f}s" start="{seg.start:.3f}s" duration="{seg.duration:.3f}s"/>'
+        )
+        offset += seg.duration
+    total = offset
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<!DOCTYPE fcpxml>\n"
+        '<fcpxml version="1.9">\n'
+        "  <resources>\n"
+        f'    <format id="r1" name="FFVideoFormat" frameDuration="1/{fps}s" '
+        f'width="{width}" height="{height}"/>\n'
+        f'    <asset id="r2" name={quoteattr(name)} start="0s" '
+        f'duration="{media.duration:.3f}s" hasVideo="1" hasAudio="1" format="r1">\n'
+        f"      <media-rep kind=\"original-media\" src={quoteattr(_file_uri(media.path))}/>\n"
+        "    </asset>\n"
+        "  </resources>\n"
+        "  <library>\n"
+        '    <event name="VideoEditTool">\n'
+        f"      <project name={quoteattr(name + ' (edited)')}>\n"
+        f'        <sequence format="r1" duration="{total:.3f}s">\n'
+        "          <spine>\n"
+        + "\n".join(clips)
+        + "\n          </spine>\n"
+        "        </sequence>\n"
+        "      </project>\n"
+        "    </event>\n"
+        "  </library>\n"
+        "</fcpxml>\n"
+    )
+
+
+def export_fcpxml(media: MediaInfo, keep_segments: List[TimeRange], output_path: str) -> str:
+    Path(output_path).write_text(build_fcpxml(media, keep_segments), encoding="utf-8")
     return output_path
 
 
