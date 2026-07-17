@@ -80,14 +80,19 @@ python -m pytest
 
 ## 現状（MVP）
 - 実装済み（main）:
+  - **ローカルWeb GUI**（`ui/web/`, 追加依存なし）: 動画プレビュー・色分けタイムライン・
+    候補トグルで削除率ライブ更新・書き出し。起動 `python -m ui.web.server`。
   - 無音検出（ffmpeg silencedetect）→ 無音カットルール → タイムライン整形
-  - 書き出し: json / edl / html（編集確認プレビュー）/ fcpxml（NLE連携）/ 実カット動画
-  - 発話区間解析（`audio/speech.py`, 無音の補集合。既定オフの拡張点）
-  - 品質チェッカー（`quality/`, AIなしベースラインの編集レポート＋警告。`--report`）
-  - config スキーマ検証（`core/config.py`, 未知キー/型/不正formatを早期検出）
-  - 案件プロファイル（youtube / interview）。テスト 38 passed。
+  - **ローカルWhisper文字起こし**（`audio/transcribe.py`+`transcript.py`, faster-whisper任意依存）
+    → **フィラー除去ルール**（`rules/filler_rule.py`, 対象語はconfig管理）
+  - 書き出し: json / edl / html / fcpxml / 実カット動画
+  - 発話区間解析、品質チェッカー（`quality/`, `--report`）、config スキーマ検証
+  - 案件プロファイル（youtube / interview）。テスト 51 passed。
 - 進行中（別ブランチ）:
-  - `feature/ai-quality`: AI補助の品質採点スキャフォールド（`quality/ai_assist.py`, NullAssessor）。
-    実プロバイダ(API/モデル)選定は仕様書 §11 により保留。
-- 未実装（拡張点として枠のみ / 案件確定後）: filler / duplicate / restate ルール
-  （ASR・発話内容解析が必要）、GUI詳細、NLE個別連携。
+  - `feature/ai-quality`: AI補助の品質採点スキャフォールド（LLMプロバイダ選定待ち）。
+- 未実装/開発中: duplicate / restate ルール、テンポ調整、GUIのUX強化（波形等）。
+
+## パイプラインAPI（`pipeline.Pipeline`）
+- `analyze(path)` → 書き出さず解析結果を返す（GUI用）
+- `recompute(result, enabled_indices)` → 候補の採否で keep/report を再計算
+- `export_result(result, out_dir)` / `run(path, out_dir)` → 書き出し

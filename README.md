@@ -12,7 +12,15 @@
 python -m pip install -r requirements.txt
 ```
 
-## 使い方
+## 使い方（GUI・推奨）
+視覚的な編集確認GUI（ローカルWebアプリ・追加依存なし）:
+```bash
+python -m ui.web.server        # http://127.0.0.1:8000 が開く
+```
+動画パスを入力して「解析」→ 色分けタイムライン・動画プレビューで確認し、
+候補のチェックで削除率をライブ確認 → 形式を選んで「書き出し」。
+
+## 使い方（CLI）
 ```bash
 # 解析 → 編集候補 → 書き出し（既定は JSON のカットリスト）
 python -m ui.cli input.mp4
@@ -41,10 +49,12 @@ python -m pytest
 編集条件はすべて `config/*.yaml` で管理し、コードを変更せずに閾値変更・ルールの ON/OFF・
 プロファイル追加ができる。新しい解析やルールはレジストリに登録するだけで追加できる。
 
-## 実装状況（MVP）
+## 実装状況
+- ✅ ローカルWeb GUI（編集確認: プレビュー・色分けタイムライン・候補トグル・書き出し）
 - ✅ 無音検出 → 無音カット → タイムライン整形
-- ✅ 書き出し: JSON / EDL / HTML（編集確認プレビュー）/ FCPXML / 実カット動画
-- ✅ 発話区間解析（無音の補集合）、品質チェッカー（AIなし採点・レポート）
-- ✅ config スキーマ検証（設定ミスの早期検出）、案件プロファイル（youtube / interview）
-- 🌿 AI 補助の品質採点は `feature/ai-quality` ブランチで骨組み実装中（実プロバイダは選定待ち）
-- 🔲 filler / duplicate / restate ルール（ASR/発話内容解析が必要 → 案件確定後）、GUI 詳細
+- ✅ ローカルWhisper文字起こし → フィラー除去ルール（内容ベース・config管理）
+- ✅ 書き出し: JSON / EDL / HTML / FCPXML / 実カット動画
+- ✅ 発話区間解析、品質チェッカー（AIなし採点・レポート）、config スキーマ検証
+- ✅ 案件プロファイル（youtube / interview）
+- 🌿 AI 補助の品質採点は `feature/ai-quality` ブランチ（LLMプロバイダ選定待ち）
+- 🔲 duplicate / restate ルール、テンポ調整（開発中）
