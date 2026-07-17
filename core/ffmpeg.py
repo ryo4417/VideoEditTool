@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import array
 import json
 import re
 import shutil
@@ -98,6 +99,37 @@ def _parse_silence_log(stderr: str) -> List[TimeRange]:
             ranges.append(TimeRange(max(0.0, pending_start), max(0.0, end)))
             pending_start = None
     return ranges
+
+
+def extract_waveform(path: str, buckets: int = 400, sample_rate: int = 4000) -> List[float]:
+    """音声の振幅エンベロープ（0..1 に正規化した peak 列）を返す。
+
+    GUI のタイムライン背景に波形を描くための軽量データ。numpy 非依存
+    （array モジュールで s16le mono を集計）。音声が無い/無音なら空/ゼロ列。
+    """
+    ensure_available()
+    if buckets <= 0:
+        return []
+    cmd = [FFMPEG, "-v", "error", "-i", path, "-ac", "1", "-ar", str(sample_rate),
+           "-f", "s16le", "-"]
+    proc = subprocess.run(cmd, capture_output=True)
+    raw = proc.stdout
+    if not raw:
+        return []
+    samples = array.array("h")
+    samples.frombytes(raw[: len(raw) - (len(raw) % 2)])
+    n = len(samples)
+    if n == 0:
+        return []
+    size = max(1, n // buckets)
+    peaks: List[float] = []
+    for start in range(0, n, size):
+        chunk = samples[start:start + size]
+        peaks.append(max((abs(s) for s in chunk), default=0) / 32768.0)
+    peak_max = max(peaks) if peaks else 0.0
+    if peak_max > 0:
+        peaks = [round(p / peak_max, 4) for p in peaks]
+    return peaks[:buckets]
 
 
 def render_cuts(path: str, keep_segments: List[TimeRange], output_path: str) -> None:

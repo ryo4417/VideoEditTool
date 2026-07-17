@@ -72,6 +72,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._api_analyze(params)
             elif route == "/media":
                 self._serve_media(params)
+            elif route == "/api/waveform":
+                self._api_waveform(params)
             elif (_STATIC / Path(route).name).is_file() and route.count("/") == 1:
                 # /app.js などの静的ファイル（basename のみ・ディレクトリ横断は不可）
                 self._serve_static(Path(route).name)
@@ -105,6 +107,14 @@ class Handler(BaseHTTPRequestHandler):
         with _CACHE_LOCK:
             _CACHE[path] = result
         self._json(_result_json(result))
+
+    def _api_waveform(self, params: dict) -> None:
+        path = _one(params, "path")
+        if not path or not os.path.isfile(path):
+            raise FileNotFoundError(f"ファイルが見つかりません: {path}")
+        buckets = int(_one(params, "buckets") or 400)
+        from core import ffmpeg
+        self._json({"peaks": ffmpeg.extract_waveform(path, buckets=buckets)})
 
     def _api_export(self) -> None:
         body = self._read_json()

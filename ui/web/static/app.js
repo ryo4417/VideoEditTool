@@ -120,6 +120,31 @@ function escapeHtml(s) {
 
 function seek(t) { const v = $("video"); if (v.src) { v.currentTime = t; v.play().catch(() => {}); } }
 
+async function loadWaveform(path) {
+  try {
+    const res = await fetch(`/api/waveform?path=${encodeURIComponent(path)}&buckets=600`);
+    const data = await res.json();
+    if (res.ok && Array.isArray(data.peaks)) drawWaveform(data.peaks);
+  } catch (_) { /* 波形は装飾。失敗しても編集は続行可能 */ }
+}
+
+function drawWaveform(peaks) {
+  const cv = $("wave");
+  const rect = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width));
+  const h = Math.max(1, Math.floor(rect.height));
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#ffffff";
+  const n = peaks.length;
+  for (let x = 0; x < w; x++) {
+    const p = peaks[Math.floor((x / w) * n)] || 0;
+    const bh = Math.max(1, p * h);
+    ctx.fillRect(x, (h - bh) / 2, 1, bh);
+  }
+}
+
 async function analyze() {
   const path = $("path").value.trim();
   const profile = $("profile").value;
@@ -140,6 +165,7 @@ async function analyze() {
     $("result").classList.remove("hidden");
     $("status").textContent = `解析完了: ${data.media.name}`;
     renderCandidates(); renderMetrics(); renderWarnings();
+    loadWaveform(path); // タイムライン背景に波形（装飾・非同期）
   } catch (e) {
     $("status").textContent = "エラー: " + e.message;
   } finally {
