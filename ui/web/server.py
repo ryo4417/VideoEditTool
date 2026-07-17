@@ -24,6 +24,7 @@ from core.config import ConfigError, load_config
 from core.ffmpeg import FFmpegNotFound, MediaProbeError
 from core.models import EditCandidate
 from pipeline import Pipeline, PipelineResult
+from rules._text import join_words
 
 _STATIC = Path(__file__).parent / "static"
 
@@ -45,7 +46,10 @@ def _candidate_json(i: int, c: EditCandidate) -> dict:
 
 def _result_json(result: PipelineResult) -> dict:
     m = result.media
+    words = result.analysis.data.get("words", [])
     return {
+        "transcript": join_words([w.text for w in words]),
+        "transcribed": bool(words),
         "media": {
             "path": m.path, "name": Path(m.path).name, "duration": m.duration,
             "width": m.width, "height": m.height, "fps": m.fps,
@@ -64,7 +68,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         route = parsed.path
-        params = parse_qs(parsed.query)
+        # keep_blank_values: 「rules=（空）」を「全ルールOFF」として区別するため
+        params = parse_qs(parsed.query, keep_blank_values=True)
         try:
             if route == "/" or route == "/index.html":
                 self._serve_static("index.html")
@@ -111,13 +116,18 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _apply_toggles(config, params: dict) -> None:
-        """GUIの解析オプション（rules / transcript）を config に反映する。"""
-        transcript = _one(params, "transcript") == "1"
-        rules_param = _one(params, "rules")
-        if transcript:
+        """GUIの解析オプション（rules / transcript / lang）を config に反映する。"""
+        if _one(params, "transcript") == "1":
             config.data.setdefault("analysis", {}).setdefault("transcript", {})["enabled"] = True
-        if rules_param:
-            requested = {r for r in rules_param.split(",") if r}
+        lang = _one(params, "lang")
+        if lang:
+            config.data.setdefault("analysis", {}).setdefault("transcript", {})["language"] = (
+                None if lang == "auto" else lang
+            )
+        # "rules" が存在すれば（空でも）GUIを権威とし、明示されたルールのみ有効化。
+        # 全チェックOFF（rules=空）は「全ルールOFF」を意味する（既定へ戻さない）。
+        if "rules" in params:
+            requested = {r for r in _one(params, "rules").split(",") if r}
             for name, opts in config.section("rules").items():
                 if isinstance(opts, dict):
                     opts["enabled"] = name in requested

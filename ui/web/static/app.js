@@ -114,6 +114,27 @@ function renderWarnings() {
   $("warnings").innerHTML = w.map((m) => `<div class="warn">⚠ ${escapeHtml(m)}</div>`).join("");
 }
 
+// 文字起こし本文と、内容ルールが0件だった理由を表示（「空振りの無言」を防ぐ）。
+function renderTranscript() {
+  const box = $("transcript");
+  if (!STATE.contentRules || STATE.contentRules.length === 0) { box.innerHTML = ""; return; }
+  const labels = { filler: "フィラー", duplicate: "重複", restate: "言い直し" };
+  const zero = STATE.contentRules.filter(
+    (r) => !STATE.candidates.some((c) => c.rule === r)
+  );
+  let html = "";
+  if (!STATE.transcribed) {
+    html += `<div class="warn">⚠ 音声が無い/文字起こしできませんでした。</div>`;
+  } else if (zero.length) {
+    html += `<div>ℹ️ ${zero.map((r) => labels[r] || r).join("・")}に該当する箇所は見つかりませんでした。`
+      + `（下の文字起こし結果をご確認ください）</div>`;
+  }
+  if (STATE.transcript) {
+    html += `<div style="margin-top:.3rem;"><b>文字起こし:</b> ${escapeHtml(STATE.transcript)}</div>`;
+  }
+  box.innerHTML = html;
+}
+
 function escapeHtml(s) {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
@@ -149,33 +170,41 @@ async function analyze() {
   const path = $("path").value.trim();
   const profile = $("profile").value;
   if (!path) { $("status").textContent = "パスを入力してください。"; return; }
-  // 検出オプション。フィラー/重複は文字起こしが前提なので自動で有効化。
+  // 検出オプション。内容ベース(フィラー/重複/言い直し)は文字起こしが前提。
   const rules = [];
   if ($("r_silence").checked) rules.push("silence");
+  if ($("r_tempo").checked) rules.push("tempo");
   if ($("r_filler").checked) rules.push("filler");
   if ($("r_duplicate").checked) rules.push("duplicate");
-  const needTranscript = $("r_transcript").checked || $("r_filler").checked || $("r_duplicate").checked;
-  if (needTranscript) $("r_transcript").checked = true;
+  if ($("r_restate").checked) rules.push("restate");
+  const contentRules = ["filler", "duplicate", "restate"].filter((r) => rules.includes(r));
+  const needTranscript = contentRules.length > 0;
+  const lang = $("lang").value;
 
   $("analyze").disabled = true;
   $("status").textContent = needTranscript
     ? "解析中…（文字起こしはモデルDL/推論で時間がかかります）"
     : "解析中…";
   try {
+    // rules は常に送る（空＝全OFF）。lang でWhisperの言語を指定。
     const url = `/api/analyze?path=${encodeURIComponent(path)}&profile=${encodeURIComponent(profile)}`
-      + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}`;
+      + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}`
+      + `&lang=${encodeURIComponent(lang)}`;
     const res = await fetch(url);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "解析に失敗しました");
     STATE = {
       media: data.media,
       report: data.report,
+      transcript: data.transcript || "",
+      transcribed: !!data.transcribed,
+      contentRules,
       candidates: data.candidates.map((c) => ({ ...c, enabled: true })),
     };
     $("video").src = `/media?path=${encodeURIComponent(path)}`;
     $("result").classList.remove("hidden");
     $("status").textContent = `解析完了: ${data.media.name}`;
-    renderCandidates(); renderMetrics(); renderWarnings();
+    renderCandidates(); renderMetrics(); renderWarnings(); renderTranscript();
     loadWaveform(path); // タイムライン背景に波形（装飾・非同期）
   } catch (e) {
     $("status").textContent = "エラー: " + e.message;

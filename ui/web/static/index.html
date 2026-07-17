@@ -88,12 +88,18 @@
         <button id="analyze">解析</button>
       </div>
     </div>
-    <div class="row" style="margin-top:.7rem; gap:1rem;">
-      <span style="font-size:.8rem; color:var(--muted);">検出:</span>
-      <label><input type="checkbox" id="r_silence" checked> 無音</label>
-      <label><input type="checkbox" id="r_filler"> フィラー</label>
-      <label><input type="checkbox" id="r_duplicate"> 重複</label>
-      <label title="フィラー/重複にはローカルWhisperが必要"><input type="checkbox" id="r_transcript"> 文字起こし(Whisper)</label>
+    <div class="row" style="margin-top:.7rem; gap:1rem; align-items:flex-start;">
+      <span style="font-size:.8rem; color:var(--muted); padding-top:.15rem;">検出:</span>
+      <label title="一定以上の無音を丸ごとカット"><input type="checkbox" id="r_silence" checked> 無音</label>
+      <label title="長い間の超過分だけ切り、自然な間は残す"><input type="checkbox" id="r_tempo"> テンポ（間の短縮）</label>
+      <label title="「えー/あの/um」などのフィラーを削除（文字起こしを使用）"><input type="checkbox" id="r_filler"> フィラー</label>
+      <label title="同じ言い回しの繰り返しを削除（1語だけの反復は対象外）"><input type="checkbox" id="r_duplicate"> 重複</label>
+      <label title="言い直し（似た言い回しの前半）を削除（文字起こしを使用）"><input type="checkbox" id="r_restate"> 言い直し</label>
+      <label style="margin-left:.4rem;">言語:
+        <select id="lang"><option value="ja">日本語</option><option value="en">英語</option><option value="auto">自動</option></select></label>
+    </div>
+    <div style="font-size:.72rem; color:var(--muted); margin-top:.3rem;">
+      ※ フィラー/重複/言い直しは音声の文字起こし（ローカルWhisper・初回はモデル取得で時間がかかります）を自動で使います。
     </div>
     <div id="status" style="margin-top:.6rem;">動画パスを入力して「解析」を押してください。</div>
   </div>
@@ -110,6 +116,7 @@
       <h2>サマリー</h2>
       <div class="metrics" id="metrics"></div>
       <div id="warnings"></div>
+      <div id="transcript" style="margin-top:.6rem; font-size:.82rem; color:var(--muted); white-space:pre-wrap;"></div>
     </div>
 
     <div class="card">
