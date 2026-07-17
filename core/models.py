@@ -88,14 +88,21 @@ def complement_ranges(
 
     無音→発話、カット→残す区間 のように「区間の反転」を共通化する。
     """
-    ordered = sorted(ranges, key=lambda r: r.start)
+    # 各区間を [start, total] にクランプし、空・逆転・範囲外を捨てる。
+    # （末尾paddingで total を超える候補などが keep を範囲外へ伸ばすのを防ぐ）
+    clipped = []
+    for r in ranges:
+        s, e = max(r.start, start), min(r.end, total)
+        if e > s:
+            clipped.append((s, e))
+    clipped.sort()
+
     segments: List[TimeRange] = []
     cursor = start
-    for r in ordered:
-        s = max(r.start, start)
+    for s, e in clipped:
         if s > cursor:
             segments.append(TimeRange(cursor, s))
-        cursor = max(cursor, min(r.end, total))
+        cursor = max(cursor, e)
     if cursor < total:
         segments.append(TimeRange(cursor, total))
     return segments
