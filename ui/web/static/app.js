@@ -247,10 +247,17 @@ async function doExport() {
   }
 }
 
-// 再生位置に合わせて playhead を動かす。
+// 再生位置に合わせて playhead を動かす。編集後プレビュー時は有効カットを飛ばす。
 $("video").addEventListener("timeupdate", () => {
   if (!STATE) return;
-  $("play").style.left = pct($("video").currentTime, STATE.media.duration) + "%";
+  const v = $("video");
+  if ($("preview").checked) {
+    const t = v.currentTime;
+    for (const c of STATE.candidates) {
+      if (c.enabled && t >= c.start && t < c.end - 0.02) { v.currentTime = c.end; break; }
+    }
+  }
+  $("play").style.left = pct(v.currentTime, STATE.media.duration) + "%";
 });
 // タイムラインクリックでシーク。
 $("timeline").addEventListener("click", (ev) => {
