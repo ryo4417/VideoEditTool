@@ -33,7 +33,7 @@ rules:
     keep_padding_sec: 0.1     # 発話前後に残す余白
   filler:                     # フィラー除去（要 transcript）
     enabled: false            # analysis.transcript を有効化してから使う
-    words: ["えー", "えーと", "えっと", "あのー", "あの", "あー", "まあ", "その", "um", "uh", "er", "ah", "hmm", "you know"]
+    words: ["えー", "えーと", "えっと", "ええ", "ええと", "あのー", "あの", "あのう", "あー", "まあ", "まぁ", "その", "そのー", "そのう", "なんか", "こう", "um", "uh", "er", "ah", "hmm", "you know"]
     padding_sec: 0.0
   duplicate:                  # 重複除去（要 transcript）
     enabled: false

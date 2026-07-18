@@ -80,6 +80,8 @@ function selectVideo(i) {
 function removeVideo(i) {
   if (PROJECT.videos[i] && PROJECT.videos[i].status === "analyzing") return;  // 解析中の動画は消さない
   PROJECT.videos.splice(i, 1);
+  // 選択位置の追従: 選択中より前を消したら1つ手前へ、末尾超過はクランプ。
+  if (i < PROJECT.cur) PROJECT.cur--;
   if (PROJECT.cur >= PROJECT.videos.length) PROJECT.cur = PROJECT.videos.length - 1;
   renderVideoList();
   showVideo();
@@ -137,15 +139,20 @@ function renderTimeline() {
   const tl = $("timeline");
   [...tl.querySelectorAll(".cut")].forEach((n) => n.remove());
   v.cuts.forEach((c, i) => {
-    if (!c.enabled) return;
     const el = document.createElement("div");
-    el.className = "cut";
+    el.className = "cut" + (c.enabled ? "" : " off");
     el.style.left = pct(c.start, d) + "%";
     el.style.width = pct(Math.max(0.001, c.end - c.start), d) + "%";
-    el.title = `${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}（ドラッグ移動 / 端で伸縮 / ダブルクリックで削除）`;
-    el.innerHTML = `<div class="h l" data-i="${i}" data-edge="l"></div><div class="h r" data-i="${i}" data-edge="r"></div>`;
-    el.addEventListener("pointerdown", (ev) => startDrag(ev, i, ev.target.dataset.edge || "move"));
-    el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); pushHistory(); v.cuts.splice(i, 1); markEdited(); refresh(); });
+    if (c.enabled) {
+      el.title = `${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}（ドラッグ移動 / 端で伸縮 / ダブルクリックで削除）`;
+      el.innerHTML = `<div class="h l" data-i="${i}" data-edge="l"></div><div class="h r" data-i="${i}" data-edge="r"></div>`;
+      el.addEventListener("pointerdown", (ev) => startDrag(ev, i, ev.target.dataset.edge || "move"));
+      el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); pushHistory(); v.cuts.splice(i, 1); markEdited(); refresh(); });
+    } else {
+      // 無効カットはハッチ帯で表示。クリックで再度カットに戻せる（凡例「カット解除」と一致）。
+      el.title = `カット解除中: ${fmtTime(c.start)}–${fmtTime(c.end)}（クリックで再度カットにする）`;
+      el.addEventListener("click", (ev) => { ev.stopPropagation(); pushHistory(); c.enabled = true; markEdited(); refresh(); });
+    }
     tl.appendChild(el);
   });
   const ruler = $("ruler"); ruler.innerHTML = "";
@@ -306,6 +313,7 @@ function seek(t) { const el = $("video"); if (el.src) { el.currentTime = t; el.p
 // ---------- 解析中オーバーレイ ----------
 let _busyTimer = null;
 function showBusy(msg, note) {
+  if (_busyTimer) { clearInterval(_busyTimer); _busyTimer = null; }  // 多重起動でのタイマーリーク防止
   $("busynote").textContent = note || "";
   $("busyoverlay").classList.remove("hidden");
   $("busyoverlay").style.display = "flex";   // CSS詳細度/キャッシュに関わらず確実に表示
@@ -436,7 +444,7 @@ function _timeAtX(clientX) {
   return Math.max(0, Math.min(v.media.duration, ((clientX - r.left) / r.width) * v.media.duration));
 }
 function startDrag(ev, i, mode) {
-  if (isAnalyzing()) return;
+  if (cur() && cur().status === "analyzing") return;  // 表示中動画が解析中の時だけロック（他動画の背景解析中は編集可）
   ev.preventDefault(); ev.stopPropagation();
   const c = cur().cuts[i];
   _drag = { i, mode, t0: _timeAtX(ev.clientX), s0: c.start, e0: c.end };
@@ -467,7 +475,7 @@ $("video").addEventListener("timeupdate", () => {
 });
 
 $("timeline").addEventListener("pointerdown", (ev) => {
-  const v = cur(); if (!v || !v.media || isAnalyzing() || ev.target.closest(".cut")) return;
+  const v = cur(); if (!v || !v.media || v.status === "analyzing" || ev.target.closest(".cut")) return;
   const t0 = _timeAtX(ev.clientX); let created = null, moved = false;
   const mv = (e) => {
     const t = _timeAtX(e.clientX);
@@ -530,6 +538,12 @@ const drop = $("drop");
 ["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.style.borderColor = "var(--accent)"; }));
 ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.style.borderColor = "var(--border)"; }));
 drop.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]); });
+
+// パス入力欄へのドロップも受け付ける（ラベル/プレースホルダの案内どおり）。
+["dragover", "dragenter"].forEach((ev) => $("path").addEventListener(ev, (e) => e.preventDefault()));
+$("path").addEventListener("drop", (e) => { e.preventDefault(); if (e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]); });
+// ページのどこに外しても、ブラウザが動画ファイルを開いて遷移しないようにする。
+["dragover", "drop"].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault()));
 
 (async () => {
   try {

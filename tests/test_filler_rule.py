@@ -56,6 +56,20 @@ def test_reason_has_readable_spacing():
     assert cands[0].reason == "フィラー「um」"
 
 
+def test_subword_split_filler_matches():
+    # Whisperが「あの」を「あ」「の」に割っても検出できる（連結照合＋単語境界）
+    words = [Word(0.0, 0.3, "あ"), Word(0.3, 0.6, "の"), Word(0.6, 1.2, "晴れ")]
+    cands = FillerRule({"words": ["あの"]}).apply(_analysis_with_words(words))
+    assert len(cands) == 1
+    assert cands[0].time_range.start == 0.0 and cands[0].time_range.end == 0.6
+
+
+def test_filler_not_matched_inside_word():
+    # 「あのね」という1語の内部の「あの」は誤爆させない（単語境界に揃わない）
+    words = [Word(0.0, 0.6, "あのね"), Word(0.6, 1.0, "今日")]
+    assert FillerRule({"words": ["あの"]}).apply(_analysis_with_words(words)) == []
+
+
 def test_no_words_no_candidates():
     media = MediaInfo(path="x.mp4", duration=10.0, has_audio=True)
     assert FillerRule().apply(AnalysisResult(media=media)) == []
