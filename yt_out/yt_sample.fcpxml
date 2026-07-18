@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.9">
+  <resources>
+    <format id="r1" name="FFVideoFormat" frameDuration="1/30s" width="640" height="360"/>
+    <asset id="r2" name="yt_sample" start="0s" duration="1200/30s" hasVideo="1" hasAudio="1" format="r1">
+      <media-rep kind="original-media" src="file:///C:/Users/81804/Desktop/VideoEditTool/yt_sample.mp4"/>
+    </asset>
+  </resources>
+  <library>
+    <event name="VideoEditTool">
+      <project name="yt_sample (edited)">
+        <sequence format="r1" duration="1200/30s">
+          <spine>
+        <asset-clip ref="r2" name="yt_sample" offset="0/30s" start="0/30s" duration="1200/30s"/>
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>
