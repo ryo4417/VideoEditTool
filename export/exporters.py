@@ -160,8 +160,9 @@ def export_fcpxml(media: MediaInfo, keep_segments: List[TimeRange], output_path:
     return output_path
 
 
-def render(media: MediaInfo, keep_segments: List[TimeRange], output_path: str) -> str:
-    ffmpeg.render_cuts(media.path, keep_segments, output_path)
+def render(media: MediaInfo, keep_segments: List[TimeRange], output_path: str,
+           audio_fade_sec: float = 0.0) -> str:
+    ffmpeg.render_cuts(media.path, keep_segments, output_path, audio_fade_sec=audio_fade_sec)
     return output_path
 
 

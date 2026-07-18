@@ -66,6 +66,7 @@ export:
   output_dir: output
   render: false               # true で ffmpeg による実カット動画を出力
   render_ext: mp4
+  click_fade_sec: 0.005       # 実カット時、境界のクリック音を消す音声フェード秒（0で無効）
 
 # --- AI（補助のみ・既定オフ。仕様書 §9）ローカルLLM(Ollama) ---
 ai:

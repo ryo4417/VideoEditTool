@@ -159,10 +159,14 @@ def extract_waveform(path: str, buckets: int = 400, sample_rate: int = 4000) -> 
     return peaks
 
 
-def render_cuts(path: str, keep_segments: List[TimeRange], output_path: str) -> None:
+def render_cuts(
+    path: str, keep_segments: List[TimeRange], output_path: str, audio_fade_sec: float = 0.0
+) -> None:
     """keep_segments のみを連結して書き出す（実カット）。
 
     trim/atrim フィルタで各区間を切り出し concat する。
+    audio_fade_sec>0 のとき各区間の音声先頭/末尾に極短フェードを掛け、
+    カット境界のクリック音（プツ音）を抑える（尺は不変）。
     """
     ensure_available()
     if not keep_segments:
@@ -174,9 +178,11 @@ def render_cuts(path: str, keep_segments: List[TimeRange], output_path: str) -> 
         filters.append(
             f"[0:v]trim=start={seg.start}:end={seg.end},setpts=PTS-STARTPTS[v{i}]"
         )
-        filters.append(
-            f"[0:a]atrim=start={seg.start}:end={seg.end},asetpts=PTS-STARTPTS[a{i}]"
-        )
+        afilter = f"[0:a]atrim=start={seg.start}:end={seg.end},asetpts=PTS-STARTPTS"
+        fade = min(audio_fade_sec, seg.duration / 2) if audio_fade_sec > 0 else 0.0
+        if fade > 0:
+            afilter += f",afade=t=in:st=0:d={fade:.4f},afade=t=out:st={seg.duration - fade:.4f}:d={fade:.4f}"
+        filters.append(f"{afilter}[a{i}]")
         concat_inputs.append(f"[v{i}][a{i}]")
     n = len(keep_segments)
     filters.append("".join(concat_inputs) + f"concat=n={n}:v=1:a=1[outv][outa]")

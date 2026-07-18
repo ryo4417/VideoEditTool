@@ -177,6 +177,9 @@ class Pipeline:
         if export_cfg.get("render", False) and keep_segments:
             ext = export_cfg.get("render_ext", "mp4")
             outputs.append(
-                exporters.render(media, keep_segments, str(out_dir / f"{stem}_edited.{ext}"))
+                exporters.render(
+                    media, keep_segments, str(out_dir / f"{stem}_edited.{ext}"),
+                    audio_fade_sec=float(export_cfg.get("click_fade_sec", 0.0)),
+                )
             )
         return outputs
