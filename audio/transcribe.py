@@ -74,8 +74,9 @@ class FasterWhisperTranscriber(Transcriber):
 
     def transcribe(self, media_path: str) -> List[Word]:
         wm = _get_model(self.model, self.device, self.compute_type)
+        # vad_filter: 無音/BGM区間での幻聴（存在しない発話の生成）を抑える。
         segments, _info = wm.transcribe(
-            media_path, language=self.language, word_timestamps=True
+            media_path, language=self.language, word_timestamps=True, vad_filter=True
         )
         words: List[Word] = []
         for seg in segments:
@@ -98,7 +99,7 @@ def get_transcriber(cfg: Dict[str, Any]) -> Transcriber:
         return NullTranscriber()
     if provider in ("whisper", "faster-whisper"):
         return FasterWhisperTranscriber(
-            model=cfg.get("model", "base"),
+            model=cfg.get("model", "small"),
             language=cfg.get("language"),
             device=cfg.get("device", "cpu"),
             compute_type=cfg.get("compute_type", "int8"),

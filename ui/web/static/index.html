@@ -106,6 +106,7 @@
         <label class="f" for="profile">プロファイル</label>
         <select id="profile"><option value="">（なし）</option>
           <option value="youtube">youtube</option><option value="interview">interview</option></select>
+        <div id="profdesc" style="font-size:.72rem; color:var(--muted); margin-top:.2rem; max-width:220px;"></div>
       </div>
       <div style="align-self:flex-end; display:flex; gap:.4rem;">
         <button class="ghost" id="pick">ファイルを選択</button>
@@ -128,6 +129,14 @@
       <label title="言い直し（似た言い回しの前半）を削除（文字起こしを使用）"><input type="checkbox" id="r_restate"> 言い直し</label>
       <label style="margin-left:.4rem;" title="文字起こしの言語">言語:
         <select id="lang"><option value="auto">自動</option><option value="ja">日本語</option><option value="en">英語</option></select></label>
+      <label title="文字起こし精度。大きいほど高精度だが低速・初回DLが大きい">精度:
+        <select id="model">
+          <option value="tiny">最速(tiny)</option>
+          <option value="base">高速(base)</option>
+          <option value="small" selected>標準(small)</option>
+          <option value="medium">高精度(medium)</option>
+          <option value="large-v3">最高精度(large-v3)</option>
+        </select></label>
     </div>
     <div style="font-size:.72rem; color:var(--muted); margin-top:.3rem; line-height:1.7;">
       無音=無音を丸ごとカット／テンポ=長い間だけ詰める／フィラー=「えー・あの・um」/重複=同じ言い回しの繰り返し／言い直し=似た言い直しの前半。<br>
@@ -148,6 +157,10 @@
       <video id="video" controls></video>
       <div class="timeline" id="timeline"><canvas id="wave"></canvas><div class="play" id="play" style="left:0"></div></div>
       <div class="ruler" id="ruler"></div>
+      <div id="autorefwrap" style="margin-top:.2rem;">
+        <div style="font-size:.68rem; color:var(--muted);">自動検出（元）:</div>
+        <div id="autoref" style="position:relative; height:10px; background:var(--track); border-radius:3px; overflow:hidden;"></div>
+      </div>
       <div class="legend"><i style="background:var(--keep)"></i>残す<i style="background:var(--cut)"></i>カット（チェックON）<i style="background:var(--track)"></i>カット解除</div>
       <div style="margin-top:.5rem;">
         <label title="有効なカット区間を飛ばして再生し、書き出し前に仕上がりを確認できます">
@@ -164,7 +177,11 @@
 
     <div class="card">
       <h2>カット一覧・手編集 <span id="candcount" style="color:var(--muted);font-weight:400;"></span>
-        <button class="ghost" id="addcut" style="float:right; padding:.2rem .6rem;">＋ カット追加</button></h2>
+        <span style="float:right; display:flex; gap:.4rem;">
+          <button class="ghost" id="undo" title="直前の編集を取り消す" disabled style="padding:.2rem .6rem;">↩ 元に戻す</button>
+          <button class="ghost" id="resetauto" title="自動検出したカットに戻す" style="padding:.2rem .6rem;">自動カットに戻す</button>
+          <button class="ghost" id="addcut" style="padding:.2rem .6rem;">＋ カット追加</button>
+        </span></h2>
       <div style="font-size:.75rem; color:var(--muted); margin-bottom:.4rem;">
         タイムラインの赤帯を<b>ドラッグで移動</b>／<b>端をつまんで伸縮</b>／<b>ダブルクリックで削除</b>。
         下の一覧で開始・終了の微調整もできます。

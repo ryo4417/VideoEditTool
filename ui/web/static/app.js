@@ -126,7 +126,7 @@ function renderTimeline() {
     el.title = `${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}（ドラッグ移動 / 端で伸縮 / ダブルクリックで削除）`;
     el.innerHTML = `<div class="h l" data-i="${i}" data-edge="l"></div><div class="h r" data-i="${i}" data-edge="r"></div>`;
     el.addEventListener("pointerdown", (ev) => startDrag(ev, i, ev.target.dataset.edge || "move"));
-    el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); v.cuts.splice(i, 1); markEdited(); refresh(); });
+    el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); pushHistory(); v.cuts.splice(i, 1); markEdited(); refresh(); });
     tl.appendChild(el);
   });
   const ruler = $("ruler"); ruler.innerHTML = "";
@@ -157,10 +157,11 @@ function renderCuts() {
     box.appendChild(row);
   });
   box.querySelectorAll("input[type=checkbox]").forEach((cb) => {
-    cb.onchange = () => { v.cuts[+cb.dataset.i].enabled = cb.checked; markEdited(); renderTimeline(); renderMetrics(); };
+    cb.onchange = () => { pushHistory(); v.cuts[+cb.dataset.i].enabled = cb.checked; markEdited(); renderTimeline(); renderMetrics(); };
   });
   box.querySelectorAll("input.t").forEach((inp) => {
     inp.onchange = () => {
+      pushHistory();
       const c = v.cuts[+inp.dataset.i];
       c[inp.dataset.f] = Math.max(0, Math.min(v.media.duration, parseFloat(inp.value) || 0));
       if (c.end <= c.start) c.end = Math.min(v.media.duration, c.start + 0.1);
@@ -168,10 +169,45 @@ function renderCuts() {
     };
   });
   box.querySelectorAll("button[data-seek]").forEach((b) => { b.onclick = () => seek(+b.dataset.seek); });
-  box.querySelectorAll("button.del").forEach((b) => { b.onclick = () => { v.cuts.splice(+b.dataset.i, 1); markEdited(); refresh(); }; });
+  box.querySelectorAll("button.del").forEach((b) => { b.onclick = () => { pushHistory(); v.cuts.splice(+b.dataset.i, 1); markEdited(); refresh(); }; });
 }
 
-function refresh() { renderCuts(); renderTimeline(); renderMetrics(); }
+function refresh() { renderCuts(); renderTimeline(); renderMetrics(); renderAutoRef(); updateUndoBtn(); }
+
+// ---------- Undo履歴 / 自動カットの別枠保存 ----------
+function pushHistory() {
+  const v = cur(); if (!v) return;
+  v.history = v.history || [];
+  v.history.push(JSON.stringify(v.cuts));
+  if (v.history.length > 100) v.history.shift();
+  updateUndoBtn();
+}
+function undo() {
+  const v = cur(); if (!v || !v.history || !v.history.length) return;
+  v.cuts = JSON.parse(v.history.pop());
+  markEdited(); refresh();
+}
+function updateUndoBtn() {
+  const v = cur();
+  $("undo").disabled = !(v && v.history && v.history.length);
+}
+function resetToAuto() {
+  const v = cur(); if (!v || !v.autoCuts) return;
+  if (!confirm("手編集を破棄して、自動検出したカットに戻しますか？")) return;
+  pushHistory();
+  v.cuts = v.autoCuts.map((c) => ({ ...c }));
+  v.edited = false; renderVideoList(); refresh();
+}
+// 自動検出カットの参照バンド（元カットとの二段表示）。
+function renderAutoRef() {
+  const v = cur(); const box = $("autoref");
+  if (!v || !v.media || !v.autoCuts) { box.innerHTML = ""; return; }
+  const d = v.media.duration || 1;
+  box.innerHTML = v.autoCuts.map((c) =>
+    `<div style="position:absolute;top:0;height:100%;left:${pct(c.start, d)}%;`
+    + `width:${pct(Math.max(0.001, c.end - c.start), d)}%;background:var(--cut);opacity:.5;"`
+    + ` title="自動: ${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}"></div>`).join("");
+}
 
 function renderWarnings() {
   const v = cur(); const w = (v && v.report && v.report.warnings) || [];
@@ -243,7 +279,8 @@ async function analyze() {
   showBusy("解析中", needTranscript ? "文字起こしを使用中。初回はモデル取得で数分かかることがあります。" : "この動画を解析しています。");
   try {
     const url = `/api/analyze?path=${encodeURIComponent(v.path)}&profile=${encodeURIComponent($("profile").value)}`
-      + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}&lang=${encodeURIComponent(lang)}`;
+      + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}&lang=${encodeURIComponent(lang)}`
+      + `&model=${encodeURIComponent($("model").value)}`;
     const res = await fetch(url);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "解析に失敗しました");
@@ -251,6 +288,8 @@ async function analyze() {
     v.transcript = data.transcript || ""; v.transcribed = !!data.transcribed;
     v.contentRules = contentRules;
     v.cuts = data.candidates.map((c) => ({ start: c.start, end: c.end, rule: c.rule, reason: c.reason || "", enabled: true }));
+    v.autoCuts = v.cuts.map((c) => ({ ...c }));  // 自動検出結果を別枠で保存（戻す用）
+    v.history = [];
     v.status = "done"; v.edited = false;
     hideBusy();
     showVideo();
@@ -304,6 +343,7 @@ function startDrag(ev, i, mode) {
 }
 function onDrag(ev) {
   if (!_drag) return;
+  if (!_drag.pushed) { pushHistory(); _drag.pushed = true; }  // 最初の移動時だけ履歴に積む
   const v = cur(); const c = v.cuts[_drag.i]; const D = v.media.duration;
   const dt = _timeAtX(ev.clientX) - _drag.t0;
   if (_drag.mode === "l") c.start = Math.max(0, Math.min(_drag.e0 - 0.05, _drag.s0 + dt));
@@ -331,7 +371,7 @@ $("timeline").addEventListener("pointerdown", (ev) => {
     const t = _timeAtX(e.clientX);
     if (!moved && Math.abs(t - t0) < 0.08) return;
     moved = true;
-    if (!created) { created = { start: t0, end: t0, rule: "manual", reason: "手動カット", enabled: true }; v.cuts.push(created); }
+    if (!created) { pushHistory(); created = { start: t0, end: t0, rule: "manual", reason: "手動カット", enabled: true }; v.cuts.push(created); }
     created.start = Math.min(t0, t); created.end = Math.max(t0, t);
     renderTimeline(); renderMetrics();
   };
@@ -342,15 +382,28 @@ $("timeline").addEventListener("pointerdown", (ev) => {
 
 $("addcut").onclick = () => {
   const v = cur(); if (!v || !v.media) return;
+  pushHistory();
   const t = $("video").currentTime || 0, D = v.media.duration;
   const s = Math.max(0, Math.min(D - 0.2, t));
   v.cuts.push({ start: s, end: Math.min(D, s + 1.0), rule: "manual", reason: "手動カット", enabled: true });
   markEdited(); refresh();
 };
+$("undo").onclick = undo;
+$("resetauto").onclick = resetToAuto;
 
 $("analyze").onclick = analyze;
 $("export").onclick = doExport;
 $("path").addEventListener("keydown", (e) => { if (e.key === "Enter") analyze(); });
+
+// プロファイルの説明を画面に表示。
+const PROFILE_DESC = {
+  "": "既定の設定で解析します。",
+  youtube: "テンポ重視。無音を強めにカットし、間を詰めます（vlog/解説向け）。",
+  interview: "保守的。自然な間を残し、長い沈黙のみカットします（対談/インタビュー向け）。",
+};
+function updateProfDesc() { $("profdesc").textContent = PROFILE_DESC[$("profile").value] || ""; }
+$("profile").addEventListener("change", updateProfDesc);
+updateProfDesc();
 
 // ---------- 動画の追加（アップロード・D&D・お試し） ----------
 async function uploadFiles(files) {

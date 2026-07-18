@@ -20,7 +20,7 @@ analysis:
   transcript:                 # ローカルWhisperによる文字起こし（内容ベースのルール用）
     enabled: false            # 有効化には faster-whisper が必要（重い依存）
     provider: whisper         # whisper | null
-    model: base               # tiny/base/small/medium/large-v3 など
+    model: small              # tiny/base/small/medium/large-v3（大きいほど高精度・低速）
     language: ja              # 言語（null で自動判定）
     device: cpu               # cpu | cuda
     compute_type: int8        # int8/float16 など

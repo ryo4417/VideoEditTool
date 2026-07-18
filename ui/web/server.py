@@ -144,6 +144,9 @@ class Handler(BaseHTTPRequestHandler):
             config.data.setdefault("analysis", {}).setdefault("transcript", {})["language"] = (
                 None if lang == "auto" else lang
             )
+        model = _one(params, "model")
+        if model:
+            config.data.setdefault("analysis", {}).setdefault("transcript", {})["model"] = model
         # "rules" が存在すれば（空でも）GUIを権威とし、明示されたルールのみ有効化。
         # 全チェックOFF（rules=空）は「全ルールOFF」を意味する（既定へ戻さない）。
         if "rules" in params:
