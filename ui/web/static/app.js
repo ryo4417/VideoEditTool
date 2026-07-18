@@ -248,6 +248,7 @@ async function doExport() {
       profile: $("profile").value || null,
       format: $("fmt").value,
       render: $("render").checked,
+      output_dir: $("outdir").value.trim().replace(/^["']|["']$/g, "").trim() || null,
       enabled_indices: STATE.candidates.filter((c) => c.enabled).map((c) => c.index),
     };
     const res = await fetch("/api/export", {
@@ -311,6 +312,21 @@ const drop = $("drop");
   e.preventDefault(); drop.style.borderColor = "var(--border)";
 }));
 drop.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+
+// Googleドライブ(デスクトップ版)を検出したら「Driveに保存」ボタンを表示。
+(async () => {
+  try {
+    const res = await fetch("/api/drive");
+    const data = await res.json();
+    if (res.ok && data.roots && data.roots.length) {
+      const root = data.roots[0];
+      const btn = $("usedrive");
+      btn.style.display = "";
+      btn.title = root;
+      btn.onclick = () => { $("outdir").value = root + "\\VideoEditTool出力"; };
+    }
+  } catch (_) { /* Drive未導入なら何もしない */ }
+})();
 
 $("sample").onclick = async () => {
   $("status").textContent = "お試し動画を作成中…";

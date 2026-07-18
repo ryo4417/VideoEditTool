@@ -89,6 +89,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._serve_media(params)
             elif route == "/api/waveform":
                 self._api_waveform(params)
+            elif route == "/api/drive":
+                self._json({"roots": [str(r) for r in drive_roots()]})
             elif (_STATIC / Path(route).name).is_file() and route.count("/") == 1:
                 # /app.js などの静的ファイル（basename のみ・ディレクトリ横断は不可）
                 self._serve_static(Path(route).name)
@@ -303,17 +305,42 @@ def _clean_path(p: str) -> str:
     return (p or "").strip().strip('"').strip("'").strip()
 
 
-# GUIからの出力先は作業ディレクトリ配下に限定（任意パスへの書き込みを防ぐ）。
+# GUIからの出力先は作業ディレクトリ or Googleドライブ配下に限定（任意パス書き込みを防ぐ）。
 _BASE_DIR = Path.cwd().resolve()
+
+
+def drive_roots() -> list:
+    """Google Drive for Desktop のマウント（マイドライブ）を検出して返す。"""
+    import string
+    roots = []
+    for letter in string.ascii_uppercase:
+        for sub in ("マイドライブ", "My Drive"):
+            p = Path(f"{letter}:\\") / sub
+            try:
+                if p.is_dir():
+                    roots.append(p.resolve())
+            except OSError:
+                pass
+    legacy = Path.home() / "Google Drive"
+    if legacy.is_dir():
+        roots.append(legacy.resolve())
+    return roots
+
+
+def _allowed_bases() -> list:
+    return [_BASE_DIR] + drive_roots()
 
 
 def _safe_output_dir(value):
     if not value:
         return None
     resolved = (Path(value) if os.path.isabs(value) else _BASE_DIR / value).resolve()
-    if resolved != _BASE_DIR and _BASE_DIR not in resolved.parents:
-        raise ValueError(f"出力先は作業ディレクトリ配下に限定されます: {value}")
-    return str(resolved)
+    for base in _allowed_bases():
+        if resolved == base or base in resolved.parents:
+            return str(resolved)
+    raise ValueError(
+        f"出力先は作業フォルダまたはGoogleドライブ配下に限定されます: {value}"
+    )
 
 
 def serve(port: int = 8000, open_browser: bool = True) -> None:

@@ -148,6 +148,13 @@
         <div style="align-self:flex-end;"><label class="f"><input type="checkbox" id="render"> 実カット動画も出力</label></div>
         <div style="align-self:flex-end;"><button id="export">書き出し</button></div>
       </div>
+      <div class="row" style="margin-top:.5rem;">
+        <div style="flex:1; min-width:240px;">
+          <label class="f" for="outdir">出力先フォルダ（空欄なら output/。Googleドライブの同期フォルダも指定可）</label>
+          <input type="text" id="outdir" placeholder="例: G:\マイドライブ\編集済み">
+        </div>
+        <div style="align-self:flex-end;"><button class="ghost" id="usedrive" style="display:none;">Googleドライブに保存</button></div>
+      </div>
       <div id="exportout" class="outs" style="margin-top:.6rem;"></div>
     </div>
   </div>
