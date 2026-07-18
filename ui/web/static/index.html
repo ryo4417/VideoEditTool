@@ -55,6 +55,12 @@
   .cand .t { width:70px; font:inherit; padding:.15rem .3rem; border:1px solid var(--border);
     border-radius:6px; background:var(--bg); color:var(--ink); font-variant-numeric:tabular-nums; }
   .cand .del { background:transparent; color:var(--cut); border:0; cursor:pointer; font-size:1rem; padding:0 .3rem; }
+  /* 文字起こしの単語トラック（時間軸に並べる） */
+  #wordtrack { position:relative; height:20px; margin-top:3px; }
+  #wordtrack .w { position:absolute; top:0; height:100%; font-size:.68rem; line-height:20px;
+    white-space:nowrap; overflow:hidden; color:var(--ink); border-left:1px solid var(--border);
+    padding-left:2px; cursor:pointer; }
+  #wordtrack .w.cutword { color:var(--cut); text-decoration:line-through; opacity:.8; }
   .timeline .play { position:absolute; top:0; width:2px; height:100%; background:#fff;
     box-shadow:0 0 0 1px rgba(0,0,0,.5); pointer-events:none; }
   .ruler { position:relative; height:18px; margin-top:2px; color:var(--muted); font-size:.7rem; }
@@ -162,11 +168,22 @@
     </div>
     <div class="card">
       <video id="video" controls></video>
-      <div class="timeline" id="timeline"><canvas id="wave"></canvas><div class="play" id="play" style="left:0"></div></div>
-      <div class="ruler" id="ruler"></div>
-      <div id="autorefwrap" style="margin-top:.2rem;">
-        <div style="font-size:.68rem; color:var(--muted);">自動検出（元）:</div>
-        <div id="autoref" style="position:relative; height:10px; background:var(--track); border-radius:3px; overflow:hidden;"></div>
+      <div class="row" style="justify-content:flex-end; gap:.3rem; margin:.4rem 0 .2rem;">
+        <span style="font-size:.72rem;color:var(--muted);align-self:center;">波形の拡大:</span>
+        <button class="ghost" id="zoomout" style="padding:.1rem .5rem;">−</button>
+        <span id="zoomlbl" style="font-size:.75rem;align-self:center;min-width:42px;text-align:center;">100%</span>
+        <button class="ghost" id="zoomin" style="padding:.1rem .5rem;">＋</button>
+      </div>
+      <div id="tlscroll" style="overflow-x:auto; overflow-y:hidden;">
+        <div id="tlinner" style="width:100%;">
+          <div class="timeline" id="timeline"><canvas id="wave"></canvas><div class="play" id="play" style="left:0"></div></div>
+          <div class="ruler" id="ruler"></div>
+          <div id="wordtrack" title="文字起こし（カットに掛かる語は取り消し線）"></div>
+          <div id="autorefwrap" style="margin-top:.2rem;">
+            <div style="font-size:.68rem; color:var(--muted);">自動検出（元）:</div>
+            <div id="autoref" style="position:relative; height:10px; background:var(--track); border-radius:3px; overflow:hidden;"></div>
+          </div>
+        </div>
       </div>
       <div class="legend"><i style="background:var(--keep)"></i>残す<i style="background:var(--cut)"></i>カット（チェックON）<i style="background:var(--track)"></i>カット解除</div>
       <div style="margin-top:.5rem;">

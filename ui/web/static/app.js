@@ -96,6 +96,7 @@ function showVideo() {
   if (!v) { $("result").classList.add("hidden"); return; }
   $("result").classList.remove("hidden");
   $("video").src = `/media?path=${encodeURIComponent(v.path)}`;
+  ZOOM = 1; $("tlinner").style.width = "100%"; $("zoomlbl").textContent = "100%";
   if (v.status === "done") {
     refresh(); renderWarnings(); renderTranscript();
     loadWaveform(v.path);
@@ -192,7 +193,35 @@ function renderCuts() {
   box.querySelectorAll("button.del").forEach((b) => { b.onclick = () => { pushHistory(); v.cuts.splice(+b.dataset.i, 1); markEdited(); refresh(); }; });
 }
 
-function refresh() { renderCuts(); renderTimeline(); renderMetrics(); renderAutoRef(); updateUndoBtn(); }
+function refresh() { renderCuts(); renderTimeline(); renderMetrics(); renderAutoRef(); renderWordTrack(); updateUndoBtn(); }
+
+// ---------- 波形ズーム ----------
+let ZOOM = 1;
+function applyZoom() {
+  ZOOM = Math.max(1, Math.min(30, ZOOM));
+  $("tlinner").style.width = (ZOOM * 100) + "%";
+  $("zoomlbl").textContent = Math.round(ZOOM * 100) + "%";
+  const v = cur();
+  if (v && v._peaks) drawWaveform(v._peaks);  // 幅が変わったので波形を再描画
+  renderTimeline(); renderWordTrack(); renderAutoRef();
+}
+
+// ---------- 文字起こしの単語トラック（波形の下に時間軸で並べる） ----------
+function isInActiveCut(t) {
+  const v = cur();
+  return v.cuts.some((c) => c.enabled && t >= c.start && t < c.end);
+}
+function renderWordTrack() {
+  const v = cur(); const box = $("wordtrack");
+  if (!v || !v.media || !v.words || !v.words.length) { box.innerHTML = ""; return; }
+  const d = v.media.duration || 1;
+  box.innerHTML = v.words.map((w) => {
+    const mid = (w.start + w.end) / 2;
+    const cls = isInActiveCut(mid) ? "w cutword" : "w";
+    return `<span class="${cls}" style="left:${pct(w.start, d)}%;" data-t="${w.start}" title="${fmtTime(w.start)}">${escapeHtml(w.text)}</span>`;
+  }).join("");
+  box.querySelectorAll(".w").forEach((el) => { el.onclick = () => seek(+el.dataset.t); });
+}
 
 // ---------- Undo履歴 / 自動カットの別枠保存 ----------
 function pushHistory() {
@@ -262,9 +291,9 @@ function hideBusy() { if (_busyTimer) { clearInterval(_busyTimer); _busyTimer = 
 
 async function loadWaveform(path) {
   try {
-    const res = await fetch(`/api/waveform?path=${encodeURIComponent(path)}&buckets=600`);
+    const res = await fetch(`/api/waveform?path=${encodeURIComponent(path)}&buckets=1200`);
     const data = await res.json();
-    if (res.ok && Array.isArray(data.peaks)) drawWaveform(data.peaks);
+    if (res.ok && Array.isArray(data.peaks)) { const v = cur(); if (v) v._peaks = data.peaks; drawWaveform(data.peaks); }
   } catch (_) { /* 波形は装飾 */ }
 }
 function drawWaveform(peaks) {
@@ -411,6 +440,8 @@ $("addcut").onclick = () => {
 };
 $("undo").onclick = undo;
 $("resetauto").onclick = resetToAuto;
+$("zoomin").onclick = () => { ZOOM *= 1.6; applyZoom(); };
+$("zoomout").onclick = () => { ZOOM /= 1.6; applyZoom(); };
 
 $("analyze").onclick = analyze;
 $("export").onclick = doExport;
