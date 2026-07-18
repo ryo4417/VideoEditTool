@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 //            transcribed, contentRules, report, status:'new'|'analyzing'|'done', edited:bool }
 let PROJECT = { videos: [], cur: -1 };
 let analyzingPath = null;  // 解析中の動画のpath（1本ずつ）。UI全体はロックしない。
+let analyzeQueue = [];     // 解析待ち（解析中に投入された次の動画）。その間も編集は続けられる。
 function isAnalyzing() { return analyzingPath !== null; }
 function cur() { return PROJECT.cur >= 0 ? PROJECT.videos[PROJECT.cur] : null; }
 function markEdited() { const v = cur(); if (v && v.status === "done") { v.edited = true; renderVideoList(); } }
@@ -53,6 +54,7 @@ function renderVideoList() {
   box.innerHTML = "";
   PROJECT.videos.forEach((v, i) => {
     const st = v.status === "analyzing" ? '<span class="st run">解析中…</span>'
+      : v.status === "queued" ? '<span class="st run">解析待ち…</span>'
       : v.status === "done" ? `<span class="st ok">解析済み${v.edited ? "・編集あり" : ""}</span>`
         : '<span class="st">未解析</span>';
     // 各動画に個別「解析」ボタン。編集中の別動画から切り替えずに背景解析できる。
@@ -374,7 +376,14 @@ async function analyze() {
 }
 
 async function analyzeVideo(v) {
-  if (isAnalyzing()) { $("status").textContent = "別の動画を解析中です。完了までお待ちください。"; return; }
+  if (isAnalyzing()) {
+    // 解析中は待ち行列へ（その間もこの動画/他動画の編集は続けられる）。
+    if (v.status !== "analyzing" && v.status !== "queued" && !analyzeQueue.includes(v)) {
+      analyzeQueue.push(v); v.status = "queued"; renderVideoList();
+      $("status").textContent = `「${v.name}」を解析待ちに追加しました（現在の解析が終わり次第、自動で実行）。編集は続けられます。`;
+    }
+    return;
+  }
   const rules = [];
   ["silence", "tempo", "filler", "duplicate", "restate"].forEach((r) => { if ($("r_" + r).checked) rules.push(r); });
   const contentRules = ["filler", "duplicate", "restate"].filter((r) => rules.includes(r));
@@ -386,9 +395,10 @@ async function analyzeVideo(v) {
     $("status").textContent = "ヒント: フィラー/重複/言い直しは精度 small 以上が確実です（baseは取りこぼしがち）。";
   }
 
-  // 再解析（done）時: 自動カットは新条件で作り直すが、手動追加カットは残す。
-  const reanalyze = v.status === "done";
-  const prevManual = reanalyze ? v.cuts.filter((c) => c.rule === "manual").map((c) => ({ ...c })) : [];
+  // 再解析（過去に解析済み）時: 自動カットは新条件で作り直すが、手動追加カットは残す。
+  // status は待ち行列で 'queued' に変わりうるため、解析歴は autoCuts の有無で判定。
+  const reanalyze = !!v.autoCuts;
+  const prevManual = reanalyze ? (v.cuts || []).filter((c) => c.rule === "manual").map((c) => ({ ...c })) : [];
   if (reanalyze && v.edited) {
     const msg = prevManual.length
       ? `「${v.name}」を再解析します。新しい検出条件で自動カットを作り直します（手動で追加したカットは残します）。自動カットへの手編集（移動/伸縮/削除）は失われます。続けますか？`
@@ -441,6 +451,10 @@ async function analyzeVideo(v) {
       : e.message;
     $("status").textContent = `エラー(${v.name}): ` + msg;
     renderVideoList();
+  } finally {
+    // 待ち行列に次があれば自動で実行（解析中もユーザーは編集を続けられる）。
+    const next = analyzeQueue.shift();
+    if (next && PROJECT.videos.includes(next)) analyzeVideo(next);
   }
 }
 
