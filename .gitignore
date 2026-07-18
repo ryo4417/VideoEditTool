@@ -75,3 +75,12 @@ coverage/
 yt_out/
 yt_sample.*
 yt_talk.*
+
+# ペルソナテストの一時生成物
+out_p3*/
+p3a*
+p3b*
+p3c*
+persona3*
+tmp_p3*.yaml
+config/profiles/tmp_*.yaml
