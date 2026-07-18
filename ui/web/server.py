@@ -84,6 +84,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if route == "/" or route == "/index.html":
                 self._serve_static("index.html")
+            elif route == "/favicon.ico":
+                self.send_response(HTTPStatus.NO_CONTENT)
+                self.end_headers()
             elif route == "/api/analyze":
                 self._api_analyze(params)
             elif route == "/media":
