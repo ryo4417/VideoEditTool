@@ -70,3 +70,8 @@ yarn-error.log*
 # === その他 ===
 coverage/
 *.local
+
+# YouTube検証用の一時素材/出力
+yt_out/
+yt_sample.*
+yt_talk.*
