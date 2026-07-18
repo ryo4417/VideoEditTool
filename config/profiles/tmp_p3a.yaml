@@ -1,0 +1,24 @@
+# persona3a 用の自分プロファイル（テンポ良いトーク動画向け）。
+# default.yaml を深いマージで上書き。既存ファイルは触らない。
+
+analysis:
+  silence:
+    min_silence_sec: 0.3
+  transcript:
+    enabled: true
+    language: en
+
+rules:
+  silence:
+    min_cut_sec: 0.3
+    keep_padding_sec: 0.05
+  tempo:
+    enabled: true
+    target_pause_sec: 0.35
+    min_gap_sec: 0.5
+  filler:
+    enabled: true
+    words: ["um", "uh", "er", "ah", "hmm", "you know", "so", "えー", "あの"]
+
+timeline:
+  merge_gap_sec: 0.15

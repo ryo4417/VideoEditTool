@@ -413,7 +413,7 @@ function _timeAtX(clientX) {
   return Math.max(0, Math.min(v.media.duration, ((clientX - r.left) / r.width) * v.media.duration));
 }
 function startDrag(ev, i, mode) {
-  if (analyzing) return;
+  if (isAnalyzing()) return;
   ev.preventDefault(); ev.stopPropagation();
   const c = cur().cuts[i];
   _drag = { i, mode, t0: _timeAtX(ev.clientX), s0: c.start, e0: c.end };
@@ -444,7 +444,7 @@ $("video").addEventListener("timeupdate", () => {
 });
 
 $("timeline").addEventListener("pointerdown", (ev) => {
-  const v = cur(); if (!v || !v.media || analyzing || ev.target.closest(".cut")) return;
+  const v = cur(); if (!v || !v.media || isAnalyzing() || ev.target.closest(".cut")) return;
   const t0 = _timeAtX(ev.clientX); let created = null, moved = false;
   const mv = (e) => {
     const t = _timeAtX(e.clientX);
