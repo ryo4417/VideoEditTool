@@ -342,6 +342,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", f"{ctype}; charset=utf-8" if "json" in ctype or "html" in ctype else ctype)
         self.send_header("Content-Length", str(len(data)))
+        # 古いJS/HTMLがブラウザにキャッシュされて不整合になるのを防ぐ。
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(data)
 

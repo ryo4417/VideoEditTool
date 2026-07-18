@@ -343,8 +343,12 @@ async function analyzeVideo(v) {
     const url = `/api/analyze?path=${encodeURIComponent(v.path)}&profile=${encodeURIComponent($("profile").value)}`
       + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}&lang=${encodeURIComponent(lang)}`
       + `&model=${encodeURIComponent(model)}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // 無限待ちを防ぐタイムアウト（文字起こしは重いので長め）。
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), needTranscript ? 900000 : 120000);
+    let res, data;
+    try { res = await fetch(url, { signal: ctl.signal }); data = await res.json(); }
+    finally { clearTimeout(to); }
     if (!res.ok) throw new Error(data.error || "解析に失敗しました");
     v.media = data.media; v.report = data.report;
     v.transcript = data.transcript || ""; v.transcribed = !!data.transcribed;
@@ -368,7 +372,10 @@ async function analyzeVideo(v) {
     v.status = v.media ? "done" : "new";
     analyzingPath = null;
     if (v === cur()) hideBusy();
-    $("status").textContent = `エラー(${v.name}): ` + e.message;
+    const msg = e.name === "AbortError"
+      ? "時間がかかりすぎたため中断しました。精度を下げる/短い動画で試してください。"
+      : e.message;
+    $("status").textContent = `エラー(${v.name}): ` + msg;
     renderVideoList();
   }
 }
