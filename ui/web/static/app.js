@@ -141,6 +141,20 @@ function escapeHtml(s) {
 
 function seek(t) { const v = $("video"); if (v.src) { v.currentTime = t; v.play().catch(() => {}); } }
 
+// 処理中インジケータ（スピナー＋経過秒）。同期処理でも「固まっていない」ことを示す。
+let _busyTimer = null;
+function startBusy(msg, note) {
+  const t0 = Date.now();
+  const paint = () => {
+    const sec = Math.floor((Date.now() - t0) / 1000);
+    $("status").innerHTML = `<span class="spin"></span>${escapeHtml(msg)}（${sec}秒）`
+      + (note ? `<br><span style="font-size:.75rem;">${escapeHtml(note)}</span>` : "");
+  };
+  paint();
+  _busyTimer = setInterval(paint, 1000);
+}
+function stopBusy() { if (_busyTimer) { clearInterval(_busyTimer); _busyTimer = null; } }
+
 async function loadWaveform(path) {
   try {
     const res = await fetch(`/api/waveform?path=${encodeURIComponent(path)}&buckets=600`);
@@ -184,9 +198,9 @@ async function analyze() {
   const lang = $("lang").value;
 
   $("analyze").disabled = true;
-  $("status").textContent = needTranscript
-    ? "解析中…（文字起こしはモデルDL/推論で時間がかかります）"
-    : "解析中…";
+  startBusy("解析中", needTranscript
+    ? "文字起こしを使用中。初回はモデル取得で数分かかることがあります。"
+    : "");
   try {
     // rules は常に送る（空＝全OFF）。lang でWhisperの言語を指定。
     const url = `/api/analyze?path=${encodeURIComponent(path)}&profile=${encodeURIComponent(profile)}`
@@ -218,6 +232,7 @@ async function analyze() {
   } catch (e) {
     $("status").textContent = "エラー: " + e.message;
   } finally {
+    stopBusy();
     $("analyze").disabled = false;
   }
 }
@@ -225,7 +240,8 @@ async function analyze() {
 async function doExport() {
   if (!STATE) return;
   $("export").disabled = true;
-  $("exportout").textContent = "書き出し中…";
+  $("exportout").innerHTML = `<span class="spin"></span>書き出し中…`
+    + ($("render").checked ? "（実カット動画は時間がかかります）" : "");
   try {
     const body = {
       path: STATE.media.path,
