@@ -91,6 +91,7 @@
   /* 解析中オーバーレイ */
   #busyoverlay { position:absolute; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
     background:color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter:blur(1.5px); border-radius:12px; }
+  #busyoverlay.hidden { display:none; }  /* IDセレクタに勝たせて確実に隠す */
   #result.busy > .card { opacity:.5; pointer-events:none; }  /* 解析中は結果を薄く＋操作ロック */
   .warn { color:#b45309; font-size:.85rem; margin:.2rem 0; }
   #status { font-size:.85rem; color:var(--muted); }

@@ -290,12 +290,18 @@ let _busyTimer = null;
 function showBusy(msg, note) {
   $("busynote").textContent = note || "";
   $("busyoverlay").classList.remove("hidden");
+  $("busyoverlay").style.display = "flex";   // CSS詳細度/キャッシュに関わらず確実に表示
   $("result").classList.add("busy");
   const t0 = Date.now();
   const paint = () => { $("busytext").textContent = `${msg}（${Math.floor((Date.now() - t0) / 1000)}秒）`; };
   paint(); _busyTimer = setInterval(paint, 1000);
 }
-function hideBusy() { if (_busyTimer) { clearInterval(_busyTimer); _busyTimer = null; } $("busyoverlay").classList.add("hidden"); $("result").classList.remove("busy"); }
+function hideBusy() {
+  if (_busyTimer) { clearInterval(_busyTimer); _busyTimer = null; }
+  $("busyoverlay").classList.add("hidden");
+  $("busyoverlay").style.display = "none";   // 確実に隠す（IDセレクタのdisplay:flex対策）
+  $("result").classList.remove("busy");
+}
 
 async function loadWaveform(path) {
   try {
