@@ -7,7 +7,8 @@ const $ = (id) => document.getElementById(id);
 // 動画1件: { path, name, media, cuts:[{start,end,rule,reason,enabled}], transcript,
 //            transcribed, contentRules, report, status:'new'|'analyzing'|'done', edited:bool }
 let PROJECT = { videos: [], cur: -1 };
-let analyzing = false;
+let analyzingPath = null;  // 解析中の動画のpath（1本ずつ）。UI全体はロックしない。
+function isAnalyzing() { return analyzingPath !== null; }
 function cur() { return PROJECT.cur >= 0 ? PROJECT.videos[PROJECT.cur] : null; }
 function markEdited() { const v = cur(); if (v && v.status === "done") { v.edited = true; renderVideoList(); } }
 
@@ -53,25 +54,30 @@ function renderVideoList() {
     const st = v.status === "analyzing" ? '<span class="st run">解析中…</span>'
       : v.status === "done" ? `<span class="st ok">解析済み${v.edited ? "・編集あり" : ""}</span>`
         : '<span class="st">未解析</span>';
+    // 各動画に個別「解析」ボタン。編集中の別動画から切り替えずに背景解析できる。
+    const canAnalyze = v.status !== "analyzing" && !isAnalyzing();
+    const runBtn = `<button class="va" data-i="${i}" ${canAnalyze ? "" : "disabled"}`
+      + ` title="この動画を解析（他を編集中でも切り替わりません）">解析</button>`;
     const el = document.createElement("div");
     el.className = "vitem" + (i === PROJECT.cur ? " sel" : "");
-    el.innerHTML = `<span class="nm" title="${escapeHtml(v.path)}">${escapeHtml(v.name)}</span>${st}`
+    el.innerHTML = `<span class="nm" title="${escapeHtml(v.path)}">${escapeHtml(v.name)}</span>${st}${runBtn}`
       + `<button class="rm" data-i="${i}" title="リストから外す">✕</button>`;
-    el.onclick = (ev) => { if (ev.target.classList.contains("rm")) return; selectVideo(i); };
+    el.onclick = (ev) => { if (ev.target.tagName === "BUTTON") return; selectVideo(i); };
     box.appendChild(el);
   });
   box.querySelectorAll(".rm").forEach((b) => { b.onclick = () => removeVideo(+b.dataset.i); });
+  box.querySelectorAll(".va").forEach((b) => { b.onclick = () => analyzeVideo(PROJECT.videos[+b.dataset.i]); });
 }
 
 function selectVideo(i) {
-  if (analyzing) { $("status").textContent = "解析中は切り替えできません。完了までお待ちください。"; return; }
+  // 解析中でも切り替え可（別動画の編集を続けられる）。
   PROJECT.cur = i;
   renderVideoList();
   showVideo();
 }
 
 function removeVideo(i) {
-  if (analyzing) return;
+  if (PROJECT.videos[i] && PROJECT.videos[i].status === "analyzing") return;  // 解析中の動画は消さない
   PROJECT.videos.splice(i, 1);
   if (PROJECT.cur >= PROJECT.videos.length) PROJECT.cur = PROJECT.videos.length - 1;
   renderVideoList();
@@ -79,15 +85,12 @@ function removeVideo(i) {
 }
 
 function addVideo(path, name) {
-  // 既に同じパスがあれば選択のみ。
   const idx = PROJECT.videos.findIndex((v) => v.path === path);
-  if (idx >= 0) { PROJECT.cur = idx; }
-  else {
-    PROJECT.videos.push({ path, name: name || path.split(/[\\/]/).pop(), cuts: [], status: "new", edited: false });
-    PROJECT.cur = PROJECT.videos.length - 1;
-  }
+  if (idx >= 0) { selectVideo(idx); return; }
+  PROJECT.videos.push({ path, name: name || path.split(/[\\/]/).pop(), cuts: [], status: "new", edited: false });
   renderVideoList();
-  showVideo();
+  // 現在編集中の動画があるなら切り替えない（1本目や未選択のときだけ表示）。
+  if (PROJECT.cur < 0) { PROJECT.cur = PROJECT.videos.length - 1; showVideo(); }
 }
 
 // 選択中動画の内容を画面へ反映。
@@ -97,15 +100,20 @@ function showVideo() {
   $("result").classList.remove("hidden");
   $("video").src = `/media?path=${encodeURIComponent(v.path)}`;
   ZOOM = 1; $("tlinner").style.width = "100%"; $("zoomlbl").textContent = "100%";
+  // 表示中の動画自身が解析中ならオーバーレイ、そうでなければ解除（別動画の解析中でも編集可）。
+  if (v.status === "analyzing") showBusy("解析中", "この動画を解析しています。");
+  else hideBusy();
   if (v.status === "done") {
+    v.cuts = v.cuts || [];
     refresh(); renderWarnings(); renderTranscript();
     loadWaveform(v.path);
     $("status").textContent = `${v.name}（解析済み${v.edited ? "・編集あり" : ""}）`;
   } else {
-    // 未解析: プレビューのみ。カット/メトリクスは空。
     v.cuts = v.cuts || [];
     refresh(); $("warnings").innerHTML = ""; $("transcript").innerHTML = "";
-    $("status").textContent = `${v.name} — 検出項目を選んで「解析」を押してください`;
+    $("status").textContent = v.status === "analyzing"
+      ? `${v.name} を解析中…`
+      : `${v.name} — 検出項目を選んで「解析」を押してください`;
   }
 }
 
@@ -305,31 +313,36 @@ function drawWaveform(peaks) {
   for (let x = 0; x < w; x++) { const p = peaks[Math.floor((x / w) * n)] || 0; const bh = Math.max(1, p * h); ctx.fillRect(x, (h - bh) / 2, 1, bh); }
 }
 
-// ---------- 解析 ----------
+// ---------- 解析（背景実行・1本ずつ。UI全体はロックしない） ----------
 async function analyze() {
-  if (analyzing) return;
-  // パス欄に手入力があれば動画として追加。
+  // メイン「解析」ボタン: パス手入力を取り込み、現在の動画を解析。
   const typed = $("path").value.trim().replace(/^["']|["']$/g, "").trim();
   if (typed) { $("path").value = ""; addVideo(typed); }
   const v = cur();
-  if (!v) { $("status").textContent = "動画を追加してください（ドロップ / 選択 / お試し動画）。"; return; }
+  if (!v) { $("status").textContent = "動画を追加してください（ドロップ / 選択 / お試し動画 / URL）。"; return; }
+  analyzeVideo(v);
+}
 
+async function analyzeVideo(v) {
+  if (isAnalyzing()) { $("status").textContent = "別の動画を解析中です。完了までお待ちください。"; return; }
   const rules = [];
   ["silence", "tempo", "filler", "duplicate", "restate"].forEach((r) => { if ($("r_" + r).checked) rules.push(r); });
   const contentRules = ["filler", "duplicate", "restate"].filter((r) => rules.includes(r));
   const needTranscript = contentRules.length > 0;
-  const lang = $("lang").value;
+  const lang = $("lang").value, model = $("model").value;
 
-  // 編集済みの動画を再解析するときは確認（編集の上書き防止）。
   if (v.status === "done" && v.edited && !confirm(`「${v.name}」には手編集があります。破棄して再解析しますか？`)) return;
 
-  analyzing = true; v.status = "analyzing"; renderVideoList();
-  $("analyze").disabled = true;
-  showBusy("解析中", needTranscript ? "文字起こしを使用中。初回はモデル取得で数分かかることがあります。" : "この動画を解析しています。");
+  analyzingPath = v.path; v.status = "analyzing"; renderVideoList();
+  const viewing = (v === cur());
+  if (viewing) showBusy("解析中", needTranscript
+    ? "文字起こしを使用中。初回はモデル取得で数分かかることがあります。" : "この動画を解析しています。");
+  else $("status").textContent = `「${v.name}」を背景で解析中…（このまま編集を続けられます）`;
+
   try {
     const url = `/api/analyze?path=${encodeURIComponent(v.path)}&profile=${encodeURIComponent($("profile").value)}`
       + `&rules=${encodeURIComponent(rules.join(","))}&transcript=${needTranscript ? "1" : "0"}&lang=${encodeURIComponent(lang)}`
-      + `&model=${encodeURIComponent($("model").value)}`;
+      + `&model=${encodeURIComponent(model)}`;
     const res = await fetch(url);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "解析に失敗しました");
@@ -338,22 +351,25 @@ async function analyze() {
     v.words = data.words || [];
     v.contentRules = contentRules;
     v.cuts = data.candidates.map((c) => ({ start: c.start, end: c.end, rule: c.rule, reason: c.reason || "", enabled: true }));
-    v.autoCuts = v.cuts.map((c) => ({ ...c }));  // 自動検出結果を別枠で保存（戻す用）
+    v.autoCuts = v.cuts.map((c) => ({ ...c }));
     v.history = [];
     v.status = "done"; v.edited = false;
-    hideBusy();
-    showVideo();
-    if (v.cuts.length === 0) {
-      $("status").textContent = rules.length === 0
-        ? "検出項目が選ばれていません。項目を選ぶか「＋カット追加」で手動編集できます。"
-        : `解析完了: ${v.name} — 自動カットは0件でした（手動で追加できます）。`;
-    } else $("status").textContent = `解析完了: ${v.name}（カット${v.cuts.length}件）`;
+    analyzingPath = null;
+    if (v === cur()) {  // 表示中の動画なら反映。別動画を編集中なら割り込まない（選択で切替）。
+      showVideo();
+      $("status").textContent = v.cuts.length
+        ? `解析完了: ${v.name}（カット${v.cuts.length}件）`
+        : `解析完了: ${v.name} — 自動カットは0件（「＋カット追加」で手動編集できます）。`;
+    } else {
+      $("status").textContent = `「${v.name}」の解析が完了しました。リストで選ぶと編集できます。`;
+    }
+    renderVideoList();
   } catch (e) {
     v.status = v.media ? "done" : "new";
-    hideBusy();
-    $("status").textContent = "エラー: " + e.message;
-  } finally {
-    analyzing = false; $("analyze").disabled = false; renderVideoList();
+    analyzingPath = null;
+    if (v === cur()) hideBusy();
+    $("status").textContent = `エラー(${v.name}): ` + e.message;
+    renderVideoList();
   }
 }
 

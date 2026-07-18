@@ -84,6 +84,9 @@
   .vitem .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .vitem .st { font-size:.72rem; color:var(--muted); }
   .vitem .st.ok { color:var(--keep); } .vitem .st.run { color:var(--accent); }
+  .vitem .va { background:transparent; border:1px solid var(--accent); color:var(--accent); border-radius:6px;
+    cursor:pointer; font-size:.72rem; padding:.1rem .45rem; }
+  .vitem .va:disabled { opacity:.4; cursor:not-allowed; }
   .vitem .rm { background:transparent; border:0; color:var(--cut); cursor:pointer; }
   /* 解析中オーバーレイ */
   #busyoverlay { position:absolute; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
@@ -145,10 +148,10 @@
       <label title="文字起こし精度。大きいほど高精度だが低速・初回DLが大きい">精度:
         <select id="model">
           <option value="tiny">最速(tiny)</option>
-          <option value="base">高速(base)</option>
-          <option value="small" selected>標準(small)</option>
-          <option value="medium">高精度(medium)</option>
-          <option value="large-v3">最高精度(large-v3)</option>
+          <option value="base" selected>高速(base・推奨)</option>
+          <option value="small">標準(small・やや遅い)</option>
+          <option value="medium">高精度(medium・遅い)</option>
+          <option value="large-v3">最高精度(large-v3・かなり遅い)</option>
         </select></label>
     </div>
     <div style="font-size:.72rem; color:var(--muted); margin-top:.3rem; line-height:1.7;">

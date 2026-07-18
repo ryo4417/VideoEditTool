@@ -99,7 +99,7 @@ def get_transcriber(cfg: Dict[str, Any]) -> Transcriber:
         return NullTranscriber()
     if provider in ("whisper", "faster-whisper"):
         return FasterWhisperTranscriber(
-            model=cfg.get("model", "small"),
+            model=cfg.get("model", "base"),
             language=cfg.get("language"),
             device=cfg.get("device", "cpu"),
             compute_type=cfg.get("compute_type", "int8"),
