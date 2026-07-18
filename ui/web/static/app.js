@@ -21,6 +21,15 @@ function pct(v, total) { return total > 0 ? (v / total) * 100 : 0; }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
+// 語を読みやすく結合（英語などは空白、日本語は詰める）。
+function joinWords(texts) {
+  let out = "";
+  for (const t of texts) {
+    if (out && /[0-9A-Za-z]$/.test(out) && /^[0-9A-Za-z]/.test(t)) out += " " + t;
+    else out += t;
+  }
+  return out;
+}
 
 // 有効カットの和集合の総和と、残す区間（補集合）。
 function computeKeep(cuts, duration) {
@@ -138,6 +147,13 @@ function renderTimeline() {
   }
 }
 
+// カット区間に重なる文字起こしを取り出す（対応箇所の確認用）。
+function wordsInRange(start, end) {
+  const v = cur(); if (!v || !v.words) return "";
+  const hit = v.words.filter((w) => w.start < end && w.end > start).map((w) => w.text);
+  return hit.length ? joinWords(hit) : "";
+}
+
 function renderCuts() {
   const v = cur(); if (!v) return;
   const box = $("cands"); box.innerHTML = "";
@@ -145,13 +161,17 @@ function renderCuts() {
   v.cuts.forEach((c, i) => {
     const row = document.createElement("div");
     row.className = "cand";
+    const snip = wordsInRange(c.start, c.end);
+    const snipHtml = v.words && v.words.length
+      ? `<span class="reason" style="opacity:.85;">${snip ? "「" + escapeHtml(snip) + "」" : "（発話なし）"}</span>`
+      : `<span class="reason">${escapeHtml(c.reason || "")}</span>`;
     row.innerHTML =
       `<input type="checkbox" ${c.enabled ? "checked" : ""} data-i="${i}" title="有効/無効">` +
       `<span class="badge">${escapeHtml(c.rule)}</span>` +
       `<input class="t" type="number" step="0.05" min="0" value="${c.start.toFixed(2)}" data-i="${i}" data-f="start">` +
       `<span style="color:var(--muted)">–</span>` +
       `<input class="t" type="number" step="0.05" min="0" value="${c.end.toFixed(2)}" data-i="${i}" data-f="end">` +
-      `<span class="reason">${escapeHtml(c.reason || "")}</span>` +
+      snipHtml +
       `<button class="seek" data-seek="${c.start}">▶</button>` +
       `<button class="del" data-i="${i}" title="削除">✕</button>`;
     box.appendChild(row);
@@ -286,6 +306,7 @@ async function analyze() {
     if (!res.ok) throw new Error(data.error || "解析に失敗しました");
     v.media = data.media; v.report = data.report;
     v.transcript = data.transcript || ""; v.transcribed = !!data.transcribed;
+    v.words = data.words || [];
     v.contentRules = contentRules;
     v.cuts = data.candidates.map((c) => ({ start: c.start, end: c.end, rule: c.rule, reason: c.reason || "", enabled: true }));
     v.autoCuts = v.cuts.map((c) => ({ ...c }));  // 自動検出結果を別枠で保存（戻す用）
@@ -437,6 +458,24 @@ drop.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) uploadFi
     }
   } catch (_) { /* Drive未導入 */ }
 })();
+
+$("fetchurl").onclick = async () => {
+  const url = $("url").value.trim();
+  if (!url) { $("status").textContent = "URLを入力してください。"; return; }
+  $("fetchurl").disabled = true;
+  const t0 = Date.now();
+  const tick = setInterval(() => { $("status").innerHTML = `<span class="spin"></span>URLから取り込み中…（${Math.floor((Date.now() - t0) / 1000)}秒）`; }, 500);
+  try {
+    const res = await fetch("/api/fetch_url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "取り込みに失敗しました");
+    clearInterval(tick);
+    addVideo(data.path, data.name);
+    $("url").value = "";
+    $("status").textContent = `取り込み完了: ${data.name} → 「解析」を押してください`;
+  } catch (e) { clearInterval(tick); $("status").textContent = "エラー: " + e.message; }
+  finally { $("fetchurl").disabled = false; }
+};
 
 $("sample").onclick = async () => {
   $("status").textContent = "お試し動画を作成中…";

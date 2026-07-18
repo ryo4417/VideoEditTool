@@ -119,6 +119,13 @@
       ここに動画をドラッグ&ドロップ（複数まとめてOK）　／　動画が無ければ
       <button class="ghost" id="sample" style="padding:.2rem .6rem;">お試し動画を作る</button>
     </div>
+    <div class="row" style="margin-top:.5rem;">
+      <div style="flex:1; min-width:240px;">
+        <label class="f" for="url">YouTube等のURLから取り込み</label>
+        <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=...">
+      </div>
+      <div style="align-self:flex-end;"><button class="ghost" id="fetchurl">URLから取り込み</button></div>
+    </div>
     <div id="videolist"></div>
     <div class="row" style="margin-top:.7rem; gap:1rem; align-items:flex-start;">
       <span style="font-size:.8rem; color:var(--muted); padding-top:.15rem;">検出:</span>

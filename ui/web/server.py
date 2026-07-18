@@ -50,6 +50,7 @@ def _result_json(result: PipelineResult) -> dict:
     return {
         "transcript": join_words([w.text for w in words]),
         "transcribed": bool(words),
+        "words": [{"start": round(w.start, 3), "end": round(w.end, 3), "text": w.text} for w in words],
         "media": {
             "path": m.path, "name": Path(m.path).name, "duration": m.duration,
             "width": m.width, "height": m.height, "fps": m.fps,
@@ -112,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._api_upload(parse_qs(parsed.query, keep_blank_values=True))
             elif parsed.path == "/api/make_sample":
                 self._api_make_sample()
+            elif parsed.path == "/api/fetch_url":
+                self._api_fetch_url()
             else:
                 self._error(HTTPStatus.NOT_FOUND, f"not found: {parsed.path}")
         except (ConfigError, FileNotFoundError, FFmpegNotFound, MediaProbeError, ValueError) as e:
@@ -173,6 +176,49 @@ class Handler(BaseHTTPRequestHandler):
                 f.write(chunk)
                 remaining -= len(chunk)
         self._json({"path": str(dest)})
+
+    def _api_fetch_url(self) -> None:
+        """YouTube等のURLから動画をDLして uploads/ に保存しパスを返す（yt-dlp使用）。"""
+        url = (self._read_json().get("url") or "").strip()
+        if not url:
+            raise ValueError("URLを指定してください")
+        try:
+            import yt_dlp
+        except ImportError as e:
+            raise RuntimeError(
+                "yt-dlp が未インストールです。`pip install yt-dlp` を実行してください。"
+            ) from e
+        up_dir = _BASE_DIR / "uploads"
+        up_dir.mkdir(parents=True, exist_ok=True)
+        opts = {
+            "format": "bv*[height<=720]+ba/b[height<=720]/b",
+            "merge_output_format": "mp4",
+            "outtmpl": str(up_dir / "%(title).80B.%(ext)s"),
+            "noplaylist": True, "quiet": True, "no_warnings": True, "restrictfilenames": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info.get("entries"):  # ytsearch / playlist は先頭を採用
+                info = info["entries"][0]
+            path = None
+            rd = info.get("requested_downloads")
+            if rd and rd[0].get("filepath"):
+                path = rd[0]["filepath"]
+            if not path or not os.path.exists(path):
+                path = ydl.prepare_filename(info)
+            if not os.path.exists(path):
+                base = os.path.splitext(path)[0]
+                for ext in (".mp4", ".mkv", ".webm", ".m4v"):
+                    if os.path.exists(base + ext):
+                        path = base + ext
+                        break
+        if not os.path.exists(path):  # 最後の手段: uploads内の最新ファイル
+            files = sorted(up_dir.glob("*"), key=lambda p: p.stat().st_mtime)
+            if files:
+                path = str(files[-1])
+        if not os.path.exists(path):
+            raise MediaProbeError("ダウンロードしたファイルが見つかりませんでした")
+        self._json({"path": path, "name": os.path.basename(path)})
 
     def _api_make_sample(self) -> None:
         """お試し用のサンプル動画（無音ギャップ入り）を生成してパスを返す。"""

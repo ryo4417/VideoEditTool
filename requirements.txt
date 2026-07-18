@@ -6,6 +6,9 @@ PyYAML>=6.0        # 設定ファイル（config駆動）
 # 有効化: config.analysis.transcript.enabled=true にして下記を導入。
 # faster-whisper>=1.0   # オフライン文字起こし。初回にモデルを自動DL。
 
+# --- YouTube等URLからの取り込み（任意・GUIの「URLから取り込み」用） ---
+# yt-dlp>=2024          # `pip install yt-dlp` で有効化。ffmpeg併用。
+
 # --- 将来利用（仕様書のプラグイン候補。現時点では未使用） ---
 # numpy>=1.26       # 波形解析
 # opencv-python     # 画像解析
