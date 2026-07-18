@@ -109,14 +109,19 @@ class Pipeline:
         return keep_segments, report
 
     def build_from_cuts(self, result: PipelineResult, cut_ranges) -> PipelineResult:
-        """明示的なカット区間 [(start, end), ...] から結果を再構築する（GUI手編集用）。"""
-        from core.models import EditAction, EditCandidate, TimeRange
+        """明示的なカット区間 [(start, end), ...] から結果を再構築する（GUI手編集用）。
+
+        手編集のカットは意図的なので、近接マージ・短区間除去は適用せず正確に尊重する
+        （GUIのプレビュー表示と書き出し結果を一致させる。短い手動カットが消える問題の対策）。
+        """
+        from core.models import EditAction, EditCandidate, TimeRange, complement_ranges
         cands = []
         for s, e in cut_ranges:
             s, e = float(s), float(e)
             if e > s:
                 cands.append(EditCandidate(TimeRange(s, e), EditAction.CUT, "manual", reason="手編集"))
-        keep_segments, report = self._keep_and_report(result.media, cands)
+        keep_segments = complement_ranges([c.time_range for c in cands], result.media.duration)
+        report = QualityChecker(self.config.section("quality")).check(result.media, cands, keep_segments)
         return PipelineResult(
             media=result.media, analysis=result.analysis, candidates=cands,
             keep_segments=keep_segments, report=report,

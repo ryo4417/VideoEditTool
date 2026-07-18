@@ -26,10 +26,11 @@ function escapeHtml(s) {
 function joinWords(texts) {
   let out = "";
   for (const t of texts) {
-    if (out && /[0-9A-Za-z]$/.test(out) && /^[0-9A-Za-z]/.test(t)) out += " " + t;
+    // 直前が語字または句読点で、次が語字なら空白を入れる（英語 "know, let" を自然に）。
+    if (out && /[0-9A-Za-z,.;:!?]$/.test(out) && /^[0-9A-Za-z]/.test(t)) out += " " + t;
     else out += t;
   }
-  return out;
+  return out.replace(/\s+/g, " ").trim();
 }
 
 // 有効カットの和集合の総和と、残す区間（補集合）。
@@ -255,15 +256,31 @@ function resetToAuto() {
   v.cuts = v.autoCuts.map((c) => ({ ...c }));
   v.edited = false; renderVideoList(); refresh();
 }
-// 自動検出カットの参照バンド（元カットとの二段表示）。
+// 自動検出カットの参照バンド（元カットとの二段表示）。ダブルクリックで編集側へ復元。
 function renderAutoRef() {
   const v = cur(); const box = $("autoref");
   if (!v || !v.media || !v.autoCuts) { box.innerHTML = ""; return; }
   const d = v.media.duration || 1;
-  box.innerHTML = v.autoCuts.map((c) =>
-    `<div style="position:absolute;top:0;height:100%;left:${pct(c.start, d)}%;`
-    + `width:${pct(Math.max(0.001, c.end - c.start), d)}%;background:var(--cut);opacity:.5;"`
-    + ` title="自動: ${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}"></div>`).join("");
+  box.innerHTML = v.autoCuts.map((c, j) =>
+    `<div class="aref" data-j="${j}" style="position:absolute;top:0;height:100%;left:${pct(c.start, d)}%;`
+    + `width:${pct(Math.max(0.001, c.end - c.start), d)}%;background:var(--cut);opacity:.5;cursor:pointer;"`
+    + ` title="自動: ${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}（ダブルクリックで編集に戻す）"></div>`).join("");
+  box.querySelectorAll(".aref").forEach((el) => {
+    el.ondblclick = () => restoreAutoCut(+el.dataset.j);
+  });
+}
+// 自動検出の1件を編集中のカットに復元（消してしまったカットを個別に戻す）。
+function restoreAutoCut(j) {
+  const v = cur(); if (!v || !v.autoCuts || !v.autoCuts[j]) return;
+  const a = v.autoCuts[j];
+  if (v.cuts.some((c) => Math.abs(c.start - a.start) < 0.01 && Math.abs(c.end - a.end) < 0.01)) {
+    $("status").textContent = "そのカットは既に編集側にあります。";
+    return;
+  }
+  pushHistory();
+  v.cuts.push({ ...a, enabled: true });
+  markEdited(); refresh();
+  $("status").textContent = `自動検出のカット（${fmtTime(a.start)}–${fmtTime(a.end)}）を戻しました。`;
 }
 
 function renderWarnings() {
@@ -277,8 +294,9 @@ function renderTranscript() {
   const labels = { filler: "フィラー", duplicate: "重複", restate: "言い直し" };
   const zero = v.contentRules.filter((r) => !v.cuts.some((c) => c.rule === r));
   let html = "";
-  if (!v.transcribed) html += `<div class="warn">⚠ 音声が無い/文字起こしできませんでした。</div>`;
-  else if (zero.length) html += `<div>ℹ️ ${zero.map((r) => labels[r] || r).join("・")}に該当する箇所は見つかりませんでした。（下の文字起こしをご確認ください）</div>`;
+  if (!v.transcribed) html += `<div class="warn">⚠ 話し声を検出できませんでした（BGM/無音のみ、または音声なし）。</div>`;
+  else if (zero.length) html += `<div>ℹ️ ${zero.map((r) => labels[r] || r).join("・")}に該当する箇所は見つかりませんでした。`
+    + `うまく拾えない時は「言語」を指定し「精度」を small 以上に上げてみてください。（下の文字起こしをご確認ください）</div>`;
   if (v.transcript) html += `<div style="margin-top:.3rem;"><b>文字起こし:</b> ${escapeHtml(v.transcript)}</div>`;
   box.innerHTML = html;
 }
@@ -334,8 +352,13 @@ async function analyzeVideo(v) {
   const rules = [];
   ["silence", "tempo", "filler", "duplicate", "restate"].forEach((r) => { if ($("r_" + r).checked) rules.push(r); });
   const contentRules = ["filler", "duplicate", "restate"].filter((r) => rules.includes(r));
-  const needTranscript = contentRules.length > 0;
+  // 内容ルール、または「文字起こし表示」チェックで文字起こしを実行（字幕を常に出せる）。
+  const needTranscript = contentRules.length > 0 || $("r_transcript").checked;
   const lang = $("lang").value, model = $("model").value;
+  // フィラー等を base で狙うと取りこぼしやすいので注意を出す。
+  if (contentRules.length && (model === "tiny" || model === "base")) {
+    $("status").textContent = "ヒント: フィラー/重複/言い直しは精度 small 以上が確実です（baseは取りこぼしがち）。";
+  }
 
   if (v.status === "done" && v.edited && !confirm(`「${v.name}」には手編集があります。破棄して再解析しますか？`)) return;
 

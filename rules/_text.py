@@ -26,7 +26,8 @@ def join_words(texts: List[str]) -> str:
     """
     out = ""
     for t in texts:
-        if out and _WORDISH.match(out[-1]) and _WORDISH.match(t[:1] or " "):
+        # 直前が語字または句読点、次が語字なら空白を入れる（英語 "know, let" を自然に）。
+        if out and (_WORDISH.match(out[-1]) or out[-1] in ",.;:!?") and _WORDISH.match(t[:1] or " "):
             out += " " + t
         else:
             out += t
