@@ -38,12 +38,11 @@ function pct(v, total) { return total > 0 ? (v / total) * 100 : 0; }
 
 function renderMetrics() {
   const d = STATE.media.duration;
-  const { keep, removed } = computeKeep(STATE.candidates, d);
-  const kept = d - removed;
-  const active = STATE.candidates.filter((c) => c.enabled).length;
+  const { keep, removed } = computeKeep(STATE.cuts, d);
+  const active = STATE.cuts.filter((c) => c.enabled).length;
   const tiles = [
     ["総尺", fmtTime(d)],
-    ["残時間", fmtTime(kept)],
+    ["残時間", fmtTime(d - removed)],
     ["削除率", `${Math.round(pct(removed, d))}%`],
     ["カット", `${active}`],
     ["残区間", `${keep.length}`],
@@ -51,29 +50,29 @@ function renderMetrics() {
   $("metrics").innerHTML = tiles
     .map(([k, v]) => `<div class="metric"><div class="v">${v}</div><div class="k">${k}</div></div>`)
     .join("");
-  renderTimeline(keep);
 }
 
-function renderTimeline(keep) {
+// タイムライン再描画（各カットをドラッグ移動/端で伸縮できる赤帯として表示）。
+function renderTimeline() {
   const d = STATE.media.duration || 1;
   const tl = $("timeline");
-  // 既存の cut ブロックを消して再描画（play ライン以外）。
   [...tl.querySelectorAll(".cut")].forEach((n) => n.remove());
-  STATE.candidates.forEach((c) => {
+  STATE.cuts.forEach((c, i) => {
+    if (!c.enabled) return;
     const el = document.createElement("div");
-    el.className = "cut" + (c.enabled ? "" : " off");
+    el.className = "cut";
     el.style.left = pct(c.start, d) + "%";
-    el.style.width = pct(c.end - c.start, d) + "%";
-    el.title = `${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}`;
-    el.onclick = (ev) => { ev.stopPropagation(); seek(c.start); };
+    el.style.width = pct(Math.max(0.001, c.end - c.start), d) + "%";
+    el.title = `${c.rule} ${fmtTime(c.start)}–${fmtTime(c.end)}（ドラッグ移動 / 端で伸縮 / ダブルクリックで削除）`;
+    el.innerHTML = `<div class="h l" data-i="${i}" data-edge="l"></div><div class="h r" data-i="${i}" data-edge="r"></div>`;
+    el.addEventListener("pointerdown", (ev) => startDrag(ev, i, ev.target.dataset.edge || "move"));
+    el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); STATE.cuts.splice(i, 1); refresh(); });
     tl.appendChild(el);
   });
-  // 目盛り
   const ruler = $("ruler");
   ruler.innerHTML = "";
-  const ticks = 6;
-  for (let i = 0; i <= ticks; i++) {
-    const t = (d * i) / ticks;
+  for (let i = 0; i <= 6; i++) {
+    const t = (d * i) / 6;
     const sp = document.createElement("span");
     sp.style.left = pct(t, d) + "%";
     sp.textContent = fmtTime(t);
@@ -81,33 +80,70 @@ function renderTimeline(keep) {
   }
 }
 
-function renderCandidates() {
+// 一覧（各カットの ON/OFF・開始/終了の微調整・削除・頭出し）。
+function renderCuts() {
   const box = $("cands");
   box.innerHTML = "";
-  $("candcount").textContent = `(${STATE.candidates.length} 件)`;
-  STATE.candidates.forEach((c, i) => {
+  $("candcount").textContent = `(${STATE.cuts.length} 件)`;
+  STATE.cuts.forEach((c, i) => {
     const row = document.createElement("div");
     row.className = "cand";
     row.innerHTML =
-      `<input type="checkbox" ${c.enabled ? "checked" : ""} data-i="${i}">` +
-      `<span class="badge">${c.rule}</span>` +
-      `<span class="tc">${fmtTime(c.start)}–${fmtTime(c.end)}</span>` +
+      `<input type="checkbox" ${c.enabled ? "checked" : ""} data-i="${i}" title="このカットを有効/無効">` +
+      `<span class="badge">${escapeHtml(c.rule)}</span>` +
+      `<input class="t" type="number" step="0.05" min="0" value="${c.start.toFixed(2)}" data-i="${i}" data-f="start">` +
+      `<span style="color:var(--muted)">–</span>` +
+      `<input class="t" type="number" step="0.05" min="0" value="${c.end.toFixed(2)}" data-i="${i}" data-f="end">` +
       `<span class="reason">${escapeHtml(c.reason || "")}</span>` +
-      `<button class="seek" data-seek="${c.start}">▶ 頭出し</button>`;
+      `<button class="seek" data-seek="${c.start}">▶</button>` +
+      `<button class="del" data-i="${i}" title="削除">✕</button>`;
     box.appendChild(row);
   });
   box.querySelectorAll("input[type=checkbox]").forEach((cb) => {
-    cb.onchange = () => { STATE.candidates[+cb.dataset.i].enabled = cb.checked; renderMetrics(); renderTimeline_update(); };
+    cb.onchange = () => { STATE.cuts[+cb.dataset.i].enabled = cb.checked; renderTimeline(); renderMetrics(); };
   });
-  box.querySelectorAll("button[data-seek]").forEach((b) => {
-    b.onclick = () => seek(+b.dataset.seek);
+  box.querySelectorAll("input.t").forEach((inp) => {
+    inp.onchange = () => {
+      const c = STATE.cuts[+inp.dataset.i];
+      let v = Math.max(0, Math.min(STATE.media.duration, parseFloat(inp.value) || 0));
+      c[inp.dataset.f] = v;
+      if (c.end <= c.start) c.end = Math.min(STATE.media.duration, c.start + 0.1);
+      refresh();
+    };
+  });
+  box.querySelectorAll("button[data-seek]").forEach((b) => { b.onclick = () => seek(+b.dataset.seek); });
+  box.querySelectorAll("button.del").forEach((b) => {
+    b.onclick = () => { STATE.cuts.splice(+b.dataset.i, 1); refresh(); };
   });
 }
 
-function renderTimeline_update() {
-  const { keep } = computeKeep(STATE.candidates, STATE.media.duration);
-  renderTimeline(keep);
+// タイムライン・一覧・メトリクスをまとめて更新。
+function refresh() { renderCuts(); renderTimeline(); renderMetrics(); }
+
+// --- タイムライン上のドラッグ編集（移動 / 端で伸縮 / 空きで新規作成） ---
+let _drag = null;
+function _timeAtX(clientX) {
+  const r = $("timeline").getBoundingClientRect();
+  return Math.max(0, Math.min(STATE.media.duration, ((clientX - r.left) / r.width) * STATE.media.duration));
 }
+function startDrag(ev, i, mode) {
+  ev.preventDefault(); ev.stopPropagation();
+  const c = STATE.cuts[i];
+  _drag = { i, mode, t0: _timeAtX(ev.clientX), s0: c.start, e0: c.end };
+  window.addEventListener("pointermove", onDrag);
+  window.addEventListener("pointerup", endDrag, { once: true });
+}
+function onDrag(ev) {
+  if (!_drag) return;
+  const c = STATE.cuts[_drag.i];
+  const dt = _timeAtX(ev.clientX) - _drag.t0;
+  const D = STATE.media.duration;
+  if (_drag.mode === "l") c.start = Math.max(0, Math.min(_drag.e0 - 0.05, _drag.s0 + dt));
+  else if (_drag.mode === "r") c.end = Math.min(D, Math.max(_drag.s0 + 0.05, _drag.e0 + dt));
+  else { const len = _drag.e0 - _drag.s0; let ns = Math.max(0, Math.min(D - len, _drag.s0 + dt)); c.start = ns; c.end = ns + len; }
+  renderTimeline(); renderMetrics();
+}
+function endDrag() { window.removeEventListener("pointermove", onDrag); if (_drag) { renderCuts(); } _drag = null; }
 
 function renderWarnings() {
   const w = STATE.report.warnings || [];
@@ -120,7 +156,7 @@ function renderTranscript() {
   if (!STATE.contentRules || STATE.contentRules.length === 0) { box.innerHTML = ""; return; }
   const labels = { filler: "フィラー", duplicate: "重複", restate: "言い直し" };
   const zero = STATE.contentRules.filter(
-    (r) => !STATE.candidates.some((c) => c.rule === r)
+    (r) => !STATE.cuts.some((c) => c.rule === r)
   );
   let html = "";
   if (!STATE.transcribed) {
@@ -215,19 +251,22 @@ async function analyze() {
       transcript: data.transcript || "",
       transcribed: !!data.transcribed,
       contentRules,
-      candidates: data.candidates.map((c) => ({ ...c, enabled: true })),
+      // 手編集可能なカット集合（自動検出＝初期値。以後ユーザーが調整/追加/削除）。
+      cuts: data.candidates.map((c) => ({
+        start: c.start, end: c.end, rule: c.rule, reason: c.reason || "", enabled: true,
+      })),
     };
     $("video").src = `/media?path=${encodeURIComponent(path)}`;
     $("result").classList.remove("hidden");
     // 空状態のガイド（無言の空振り防止）。
-    if (STATE.candidates.length === 0) {
+    if (STATE.cuts.length === 0) {
       $("status").textContent = rules.length === 0
-        ? "検出項目が選ばれていません。まず「無音」にチェックを入れて解析してください。"
-        : `解析完了: ${data.media.name} — 該当するカット箇所は見つかりませんでした。`;
+        ? "検出項目が選ばれていません。まず「無音」にチェックを入れて解析するか、「＋カット追加」で手動編集できます。"
+        : `解析完了: ${data.media.name} — 自動カットは0件でした。「＋カット追加」で手動編集できます。`;
     } else {
       $("status").textContent = `解析完了: ${data.media.name}`;
     }
-    renderCandidates(); renderMetrics(); renderWarnings(); renderTranscript();
+    refresh(); renderWarnings(); renderTranscript();
     loadWaveform(path); // タイムライン背景に波形（装飾・非同期）
   } catch (e) {
     $("status").textContent = "エラー: " + e.message;
@@ -249,7 +288,8 @@ async function doExport() {
       format: $("fmt").value,
       render: $("render").checked,
       output_dir: $("outdir").value.trim().replace(/^["']|["']$/g, "").trim() || null,
-      enabled_indices: STATE.candidates.filter((c) => c.enabled).map((c) => c.index),
+      // 手編集後の最終カット区間を送る（有効なもののみ）。
+      cuts: STATE.cuts.filter((c) => c.enabled).map((c) => ({ start: c.start, end: c.end })),
     };
     const res = await fetch("/api/export", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -270,18 +310,39 @@ $("video").addEventListener("timeupdate", () => {
   const v = $("video");
   if ($("preview").checked) {
     const t = v.currentTime;
-    for (const c of STATE.candidates) {
+    for (const c of STATE.cuts) {
       if (c.enabled && t >= c.start && t < c.end - 0.02) { v.currentTime = c.end; break; }
     }
   }
   $("play").style.left = pct(v.currentTime, STATE.media.duration) + "%";
 });
-// タイムラインクリックでシーク。
-$("timeline").addEventListener("click", (ev) => {
-  if (!STATE) return;
-  const rect = ev.currentTarget.getBoundingClientRect();
-  seek(((ev.clientX - rect.left) / rect.width) * STATE.media.duration);
+// タイムライン: 空き部分をクリック→シーク、ドラッグ→新規カット作成。
+$("timeline").addEventListener("pointerdown", (ev) => {
+  if (!STATE || ev.target.closest(".cut")) return;
+  const t0 = _timeAtX(ev.clientX);
+  let created = null, moved = false;
+  const mv = (e) => {
+    const t = _timeAtX(e.clientX);
+    if (!moved && Math.abs(t - t0) < 0.08) return;
+    moved = true;
+    if (!created) { created = { start: t0, end: t0, rule: "manual", reason: "手動カット", enabled: true }; STATE.cuts.push(created); }
+    created.start = Math.min(t0, t); created.end = Math.max(t0, t);
+    renderTimeline(); renderMetrics();
+  };
+  const up = () => { window.removeEventListener("pointermove", mv); if (!moved) seek(t0); else renderCuts(); };
+  window.addEventListener("pointermove", mv);
+  window.addEventListener("pointerup", up, { once: true });
 });
+
+// 「＋ カット追加」: 再生位置に約1秒のカットを追加して手編集の起点にする。
+$("addcut").onclick = () => {
+  if (!STATE) return;
+  const t = $("video").currentTime || 0, D = STATE.media.duration;
+  const s = Math.max(0, Math.min(D - 0.2, t));
+  STATE.cuts.push({ start: s, end: Math.min(D, s + 1.0), rule: "manual", reason: "手動カット", enabled: true });
+  refresh();
+};
+
 $("analyze").onclick = analyze;
 $("export").onclick = doExport;
 $("path").addEventListener("keydown", (e) => { if (e.key === "Enter") analyze(); });

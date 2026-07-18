@@ -47,8 +47,14 @@
   .timeline { position:relative; height:52px; background:var(--keep); border-radius:8px;
     overflow:hidden; cursor:pointer; margin-top:.4rem; }
   .timeline #wave { position:absolute; inset:0; width:100%; height:100%; opacity:.28; pointer-events:none; }
-  .timeline .cut { position:absolute; top:0; height:100%; background:var(--cut); opacity:.9; }
+  .timeline .cut { position:absolute; top:0; height:100%; background:var(--cut); opacity:.9; cursor:move; }
   .timeline .cut.off { background:repeating-linear-gradient(45deg,var(--track),var(--track) 6px,transparent 6px,transparent 12px); opacity:.6; }
+  .timeline .cut:hover { outline:2px solid rgba(255,255,255,.85); outline-offset:-2px; }
+  .timeline .cut .h { position:absolute; top:0; width:9px; height:100%; cursor:ew-resize; }
+  .timeline .cut .h.l { left:-2px; } .timeline .cut .h.r { right:-2px; }
+  .cand .t { width:70px; font:inherit; padding:.15rem .3rem; border:1px solid var(--border);
+    border-radius:6px; background:var(--bg); color:var(--ink); font-variant-numeric:tabular-nums; }
+  .cand .del { background:transparent; color:var(--cut); border:0; cursor:pointer; font-size:1rem; padding:0 .3rem; }
   .timeline .play { position:absolute; top:0; width:2px; height:100%; background:#fff;
     box-shadow:0 0 0 1px rgba(0,0,0,.5); pointer-events:none; }
   .ruler { position:relative; height:18px; margin-top:2px; color:var(--muted); font-size:.7rem; }
@@ -136,7 +142,12 @@
     </div>
 
     <div class="card">
-      <h2>編集候補 <span id="candcount" style="color:var(--muted);font-weight:400;"></span></h2>
+      <h2>カット一覧・手編集 <span id="candcount" style="color:var(--muted);font-weight:400;"></span>
+        <button class="ghost" id="addcut" style="float:right; padding:.2rem .6rem;">＋ カット追加</button></h2>
+      <div style="font-size:.75rem; color:var(--muted); margin-bottom:.4rem;">
+        タイムラインの赤帯を<b>ドラッグで移動</b>／<b>端をつまんで伸縮</b>／<b>ダブルクリックで削除</b>。
+        下の一覧で開始・終了の微調整もできます。
+      </div>
       <div id="cands"></div>
     </div>
 

@@ -206,6 +206,9 @@ class Handler(BaseHTTPRequestHandler):
         enabled = body.get("enabled_indices")
         if enabled is not None and not isinstance(enabled, list):
             raise ValueError("enabled_indices は配列で指定してください")
+        cuts = body.get("cuts")  # 手編集後の最終カット区間 [{start,end}, ...]
+        if cuts is not None and not isinstance(cuts, list):
+            raise ValueError("cuts は配列で指定してください")
         profile = body.get("profile") or None
         output_dir = _safe_output_dir(body.get("output_dir"))
 
@@ -221,7 +224,12 @@ class Handler(BaseHTTPRequestHandler):
         pipe = Pipeline(config)
 
         target = cached
-        if isinstance(enabled, list):
+        if isinstance(cuts, list):
+            # 手編集後の最終カット区間を優先（GUIで調整/追加/削除した結果）。
+            ranges = [(c["start"], c["end"]) for c in cuts
+                      if isinstance(c, dict) and "start" in c and "end" in c]
+            target = pipe.build_from_cuts(cached, ranges)
+        elif isinstance(enabled, list):
             target = pipe.recompute(cached, [int(i) for i in enabled])
         outputs = pipe.export_result(target, output_dir)
         self._json({"outputs": outputs})

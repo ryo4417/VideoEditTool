@@ -108,6 +108,20 @@ class Pipeline:
         report = checker.check(media, candidates, keep_segments)
         return keep_segments, report
 
+    def build_from_cuts(self, result: PipelineResult, cut_ranges) -> PipelineResult:
+        """明示的なカット区間 [(start, end), ...] から結果を再構築する（GUI手編集用）。"""
+        from core.models import EditAction, EditCandidate, TimeRange
+        cands = []
+        for s, e in cut_ranges:
+            s, e = float(s), float(e)
+            if e > s:
+                cands.append(EditCandidate(TimeRange(s, e), EditAction.CUT, "manual", reason="手編集"))
+        keep_segments, report = self._keep_and_report(result.media, cands)
+        return PipelineResult(
+            media=result.media, analysis=result.analysis, candidates=cands,
+            keep_segments=keep_segments, report=report,
+        )
+
     def recompute(self, result: PipelineResult, enabled_indices: List[int]) -> PipelineResult:
         """候補の採否（index の集合）に基づいて keep/report を再計算した結果を返す。
 
