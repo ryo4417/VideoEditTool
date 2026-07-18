@@ -68,6 +68,22 @@ function renderVideoList() {
   });
   box.querySelectorAll(".rm").forEach((b) => { b.onclick = () => removeVideo(+b.dataset.i); });
   box.querySelectorAll(".va").forEach((b) => { b.onclick = () => analyzeVideo(PROJECT.videos[+b.dataset.i]); });
+  // 動画が2本以上あるとき「一括解析」行を出す。
+  const hasNew = PROJECT.videos.some((v) => v.status === "new");
+  $("bulkrow").classList.toggle("hidden", PROJECT.videos.length < 2 || !hasNew);
+}
+
+// 未解析の動画を、現在の検出条件で順に（1本ずつ背景）解析する。
+async function analyzeAll() {
+  if (isAnalyzing()) { $("status").textContent = "解析中です。完了後にどうぞ。"; return; }
+  const targets = PROJECT.videos.filter((v) => v.status === "new");
+  if (!targets.length) { $("status").textContent = "未解析の動画はありません（各動画の「再解析」で作り直せます）。"; return; }
+  $("analyzeall").disabled = true;
+  let done = 0;
+  for (const v of targets) { await analyzeVideo(v); done++; }
+  $("analyzeall").disabled = false;
+  $("status").textContent = `一括解析が完了しました（${done}本）。リストで選んで編集できます。`;
+  renderVideoList();
 }
 
 function selectVideo(i) {
@@ -103,6 +119,8 @@ function showVideo() {
   $("result").classList.remove("hidden");
   $("video").src = `/media?path=${encodeURIComponent(v.path)}`;
   ZOOM = 1; $("tlinner").style.width = "100%"; $("zoomlbl").textContent = "100%";
+  // ボタン表記: 解析済みは「再解析」（検出条件を変えて作り直す意図を明示）。
+  $("analyze").textContent = v.status === "done" ? "再解析" : "解析";
   // 表示中の動画自身が解析中ならオーバーレイ、そうでなければ解除（別動画の解析中でも編集可）。
   if (v.status === "analyzing") showBusy("解析中", "この動画を解析しています。");
   else hideBusy();
@@ -368,7 +386,15 @@ async function analyzeVideo(v) {
     $("status").textContent = "ヒント: フィラー/重複/言い直しは精度 small 以上が確実です（baseは取りこぼしがち）。";
   }
 
-  if (v.status === "done" && v.edited && !confirm(`「${v.name}」には手編集があります。破棄して再解析しますか？`)) return;
+  // 再解析（done）時: 自動カットは新条件で作り直すが、手動追加カットは残す。
+  const reanalyze = v.status === "done";
+  const prevManual = reanalyze ? v.cuts.filter((c) => c.rule === "manual").map((c) => ({ ...c })) : [];
+  if (reanalyze && v.edited) {
+    const msg = prevManual.length
+      ? `「${v.name}」を再解析します。新しい検出条件で自動カットを作り直します（手動で追加したカットは残します）。自動カットへの手編集（移動/伸縮/削除）は失われます。続けますか？`
+      : `「${v.name}」を再解析します。現在のカットを新しい検出条件で作り直します。続けますか？`;
+    if (!confirm(msg)) return;
+  }
 
   analyzingPath = v.path; v.status = "analyzing"; renderVideoList();
   const viewing = (v === cur());
@@ -391,10 +417,11 @@ async function analyzeVideo(v) {
     v.transcript = data.transcript || ""; v.transcribed = !!data.transcribed;
     v.words = data.words || [];
     v.contentRules = contentRules;
-    v.cuts = data.candidates.map((c) => ({ start: c.start, end: c.end, rule: c.rule, reason: c.reason || "", enabled: true }));
-    v.autoCuts = v.cuts.map((c) => ({ ...c }));
+    const autoCuts = data.candidates.map((c) => ({ start: c.start, end: c.end, rule: c.rule, reason: c.reason || "", enabled: true }));
+    v.autoCuts = autoCuts.map((c) => ({ ...c }));  // 「自動検出（元）」は自動分のみ
+    v.cuts = [...autoCuts, ...prevManual];         // 再解析時は手動追加カットを引き継ぐ
     v.history = [];
-    v.status = "done"; v.edited = false;
+    v.status = "done"; v.edited = prevManual.length > 0;  // 手動カットを引き継いだら編集ありのまま
     analyzingPath = null;
     if (v === cur()) {  // 表示中の動画なら反映。別動画を編集中なら割り込まない（選択で切替）。
       showVideo();
@@ -504,6 +531,7 @@ $("zoomin").onclick = () => { ZOOM *= 1.6; applyZoom(); };
 $("zoomout").onclick = () => { ZOOM /= 1.6; applyZoom(); };
 
 $("analyze").onclick = analyze;
+$("analyzeall").onclick = analyzeAll;
 $("export").onclick = doExport;
 $("path").addEventListener("keydown", (e) => { if (e.key === "Enter") analyze(); });
 
